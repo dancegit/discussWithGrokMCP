@@ -61,7 +61,7 @@ def test_mcp_server():
             stderr=subprocess.PIPE,
             text=True,
             env={
-                "XAI_API_KEY": "test_api_key_placeholder"
+                "XAI_API_KEY": os.getenv("XAI_API_KEY", "test_api_key_placeholder")
             }
         )
         

@@ -1,12 +1,56 @@
 # Grok MCP Server
 
-A standalone Model Context Protocol (MCP) server for Claude Code that enables direct interaction with Grok AI. Simple, reliable implementation that works with Claude Code CLI.
+A powerful Model Context Protocol (MCP) server for Claude Code that enables direct interaction with Grok AI. Features both a simple implementation for basic queries and an enhanced version with advanced capabilities.
 
-## Installation in Claude Code
+## 🚀 Features
 
-### Project-Specific Configuration (Recommended)
+### Simple Version (`simple_mcp.py`)
+- ✅ **Proven Stable** - Lightweight implementation that just works
+- 🤖 **Direct Grok Integration** - Simple access to Grok-2-1212 model
+- 🔒 **Secure** - Local .env configuration
 
-Create a `.mcp.json` file in your project root:
+### Enhanced Version (`enhanced_mcp.py`) - NEW!
+- 💬 **Multi-turn Discussions** - Extended conversations with session management
+- 📁 **Context-Aware Questions** - Include files and code in your queries
+- 🔄 **Session Management** - Save, list, and resume conversations
+- 📊 **Resource Access** - View stats, config, and session history
+- 🏥 **Health Monitoring** - Check server and API status
+- ⚡ **Advanced Features** - Model selection, temperature control, caching
+- 🛡️ **Production Ready** - Comprehensive error handling and logging
+
+## 📋 Prerequisites
+
+- Python 3.11+
+- X.AI API key from [console.x.ai](https://console.x.ai)
+- `uv` package manager (recommended)
+
+## 🔧 Installation
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/yourusername/discussWithGrokMCP.git
+cd discussWithGrokMCP
+```
+
+2. **Install dependencies:**
+```bash
+# Using uv (recommended)
+uv sync
+
+# Or using pip
+pip install -e .
+```
+
+3. **Set up your API key:**
+```bash
+echo "XAI_API_KEY=your_api_key_here" > .env
+```
+
+## 🎯 Quick Start
+
+### Using the Simple Server
+
+For basic Grok queries, use the simple server in your `.mcp.json`:
 
 ```json
 {
@@ -26,21 +70,21 @@ Create a `.mcp.json` file in your project root:
 }
 ```
 
-### Global Configuration
+### Using the Enhanced Server (Recommended)
 
-Add to your Claude Code configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+For full features, use the enhanced server in your `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "grok": {
+    "grok-enhanced": {
       "type": "stdio",
-      "command": "uv",
+      "command": "/path/to/.local/bin/uv",
       "args": [
         "--project",
         "/absolute/path/to/discussWithGrokMCP",
         "run",
-        "/absolute/path/to/discussWithGrokMCP/simple_mcp.py"
+        "/absolute/path/to/discussWithGrokMCP/enhanced_mcp.py"
       ],
       "env": {}
     }
@@ -48,151 +92,64 @@ Add to your Claude Code configuration file (`~/Library/Application Support/Claud
 }
 ```
 
-### Using Python Directly
+## 🛠️ Available Tools
 
-If you don't have `uv` installed, you can use Python directly:
+### Basic Tool (Both Versions)
+- **`grok_ask`** - Ask Grok a question
+  ```
+  Parameters:
+  - question: The question to ask
+  - model: Model to use (enhanced only)
+  - temperature: Response creativity (enhanced only)
+  ```
 
-```json
-{
-  "mcpServers": {
-    "grok": {
-      "type": "stdio",
-      "command": "python",
-      "args": ["/absolute/path/to/discussWithGrokMCP/simple_mcp.py"],
-      "env": {
-        "PYTHONPATH": "/absolute/path/to/discussWithGrokMCP"
-      }
-    }
-  }
-}
-```
+### Enhanced Tools (Enhanced Version Only)
 
-### Configuration Options
+- **`grok_discuss`** - Start an extended discussion
+  ```
+  Parameters:
+  - topic: Discussion topic
+  - context: Optional context
+  - max_turns: Number of conversation rounds
+  - expert_mode: Include expert perspectives
+  ```
 
-- **type**: Must be "stdio" for Claude Code compatibility
-- **command**: The executable to run (`uv` recommended, or `python`/`python3`)
-- **args**: Command arguments to start the server
-- **env**: Environment variables (API key is loaded from local .env file)
+- **`grok_ask_with_context`** - Ask with file context
+  ```
+  Parameters:
+  - question: Your question
+  - context_files: List of file paths
+  - context_type: "code", "docs", or "general"
+  ```
 
-### Getting Your API Key
+- **`grok_list_sessions`** - View conversation history
+  ```
+  Parameters:
+  - status: Filter by status
+  - limit: Maximum results
+  ```
 
-1. Visit [console.x.ai](https://console.x.ai)
-2. Create an account or sign in
-3. Generate an API key
-4. Add it to `.env` file in the repository root:
-   ```bash
-   echo "XAI_API_KEY=your_api_key_here" > .env
-   ```
+- **`grok_continue_session`** - Resume a conversation
+  ```
+  Parameters:
+  - session_id: Session to resume
+  - message: Your message
+  ```
 
-### Verifying Installation
+- **`grok_health`** - Check server status
+  ```
+  Parameters:
+  - verbose: Include detailed diagnostics
+  ```
 
-After adding the configuration and restarting Claude Code, you should see the Grok MCP server available with:
-- `grok_ask` - Ask Grok a question
+## 📚 Resources (Enhanced Version)
 
-## Features
+The enhanced server exposes these resources:
+- `grok://sessions` - Conversation history
+- `grok://config` - Current configuration
+- `grok://stats` - Usage statistics
 
-- 🤖 **Direct Grok Integration** - Simple access to Grok-2-1212 model via X.AI API
-- 🚀 **Lightweight Implementation** - Minimal, reliable MCP server that just works
-- 🔒 **Secure & Standalone** - Local .env configuration, no global dependencies
-- ✅ **Claude Code Compatible** - Tested and working with Claude Code CLI
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.11+
-- X.AI API key from [console.x.ai](https://console.x.ai)
-- `uv` package manager (recommended) or pip
-
-### Installation Steps
-
-1. **Clone the repository:**
-```bash
-git clone https://github.com/yourusername/discussWithGrokMCP.git
-cd discussWithGrokMCP
-```
-
-2. **Set up your API key** (choose one method):
-
-   **Option A: Using .env file (for testing)**
-   ```bash
-   echo "XAI_API_KEY=your_xai_api_key_here" > .env
-   ```
-
-   **Option B: In MCP configuration (for Claude Code)**
-   Add the key directly in your MCP configuration (see Installation in Claude Code above)
-
-3. **Install dependencies:**
-```bash
-# Using uv (recommended)
-uv sync
-
-# Or using pip
-pip install -e .
-```
-
-4. **Configure Claude Code** (see Installation in Claude Code section above)
-
-5. **Restart Claude Code** to load the MCP server
-
-### Running Tests
-
-Test the installation:
-```bash
-# Test the MCP server
-uv run python test_simple.py
-
-# Quick test with direct input
-echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | uv run ./simple_mcp.py
-```
-
-## MCP Tools
-
-### `grok_ask`
-Ask Grok a question directly.
-
-**Parameters:**
-- `question` (string, required): The question to ask
-
-**Example:**
-```json
-{
-  "name": "grok_ask",
-  "arguments": {
-    "question": "How do I implement WebSocket in Python?"
-  }
-}
-```
-
-## Project Structure
-
-```
-discussWithGrokMCP/
-├── lib/                        # Core modules
-│   └── grok_client.py         # X.AI API wrapper
-├── simple_mcp.py              # MCP server implementation
-├── test_simple.py             # Test script
-├── simple_mcp.log             # Server logs
-├── .env                       # API configuration
-└── pyproject.toml             # Dependencies
-```
-
-## Architecture
-
-The server (`simple_mcp.py`) implements a minimal MCP server that:
-1. Handles MCP protocol initialization 
-2. Lists available tools (currently just `grok_ask`)
-3. Executes tool calls by forwarding questions to the Grok API
-4. Returns responses in MCP-compatible format
-
-### Data Flow
-
-1. **MCP Request** → Claude Code sends JSON-RPC request via stdio
-2. **Request Handling** → Server parses and routes the request
-3. **API Communication** → For tool calls, forwards to Grok API
-4. **Response** → Returns JSON-RPC response to Claude Code
-
-## Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
@@ -202,59 +159,120 @@ Create a `.env` file with:
 # Required
 XAI_API_KEY=your_api_key_here
 
-# Optional (defaults shown)
+# Optional (enhanced server)
 GROK_MODEL=grok-2-1212
 GROK_TEMPERATURE=0.7
+GROK_MAX_TOKENS=4096
+MCP_LOG_LEVEL=INFO
+MCP_ENABLE_STREAMING=false
+MCP_ENABLE_CACHING=true
+MCP_CACHE_TTL=3600
 ```
 
-## Testing
+### Available Models
 
-Test the server directly:
+- `grok-2-1212` (default)
+- `grok-2-vision`
+- `grok-beta`
+
+## 🧪 Testing
+
+Run the test suite:
 
 ```bash
-# Test initialization
-echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | uv run ./simple_mcp.py
+# All tests
+uv run python run_tests.py
 
-# Test with the test script
-uv run python test_simple.py
+# Unit tests only
+uv run pytest tests/test_tools.py
+
+# Integration tests
+uv run pytest tests/test_integration.py
+
+# Quick test
+uv run python test_enhanced.py
 ```
 
-## Security
+## 📁 Project Structure
 
-- API keys stored securely in `.env` file (not in MCP configuration)
-- No global configuration dependencies
-- Simple, auditable codebase
+```
+discussWithGrokMCP/
+├── simple_mcp.py           # Simple, stable server
+├── enhanced_mcp.py         # Full-featured server
+├── lib/
+│   ├── grok_client.py      # Grok API client
+│   └── tools/              # Tool implementations
+│       ├── ask.py
+│       ├── discuss.py
+│       ├── session.py
+│       ├── context.py
+│       └── health.py
+├── tests/                  # Test suite
+├── .env                    # API key (create this)
+└── .mcp.json              # Claude Code config
+```
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
 ### Server fails to start
-- Check that your API key is correctly set in `.env` file
-- Verify key at [console.x.ai](https://console.x.ai)
-- Ensure `uv` is installed and in your PATH
+- Verify your API key in `.env`
+- Check that `uv` is installed
+- Ensure absolute paths in `.mcp.json`
 
 ### Claude Code shows "failed"
-- Restart Claude Code after configuration changes
-- Check paths in `.mcp.json` are absolute and correct
-- Review `simple_mcp.log` for error messages
+- Restart Claude Code after config changes
+- Check `simple_mcp.log` or `enhanced_mcp.log`
+- Verify Python 3.11+ is installed
 
-### Import Errors
-- Install dependencies: `uv sync`
-- Ensure Python 3.11+ is installed
+### Import errors
+- Run `uv sync` to install dependencies
+- Check Python version with `python --version`
 
-## Version History
+## 📊 Performance
 
-- **v0.3.0** - Simplified implementation (`simple_mcp.py`) that works reliably with Claude Code CLI
-- **v0.2.0** - MCP SDK-based implementation (had compatibility issues with Claude Code)
-- **v0.1.x** - Initial custom stdio implementations
+- **Simple Server**: <500ms response time, minimal memory
+- **Enhanced Server**: 
+  - Response caching reduces latency
+  - Session persistence for context
+  - Automatic retry with backoff
+  - Token usage tracking
 
-## License
+## 🔒 Security
+
+- API keys stored locally in `.env` (never committed)
+- No global dependencies
+- File access sandboxed to project directory
+- Input validation on all parameters
+
+## 🗺️ Roadmap
+
+- [x] Simple MCP implementation
+- [x] Enhanced tools and sessions
+- [x] Resource management
+- [x] Caching and error handling
+- [ ] Streaming responses
+- [ ] Web UI dashboard
+- [ ] Multi-user support
+
+## 📝 Version History
+
+- **v0.8.1** - Full enhanced implementation with 6 tools
+- **v0.3.x** - Simple implementation that works with Claude Code
+- **v0.2.0** - MCP SDK implementation (deprecated)
+- **v0.1.x** - Initial prototypes
+
+## 📄 License
 
 MIT
 
-## Contributing
+## 🤝 Contributing
 
 Contributions welcome! Please ensure all tests pass before submitting PRs.
 
-## Support
+## 💬 Support
 
 For issues or questions, please open an issue on GitHub.
+
+## 🙏 Acknowledgments
+
+Built for use with [Claude Code](https://claude.ai/code) using the Model Context Protocol.

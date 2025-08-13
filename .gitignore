@@ -19,6 +19,8 @@ grok_mcp_server.log
 
 # Test outputs
 test_storage/
+sessions/
+grok_discussions/
 
 # IDE
 .idea/

@@ -18,7 +18,7 @@ def test_mcp_server():
         "args": ["run", "python", "/home/user/gitrepos/discussWithGrokMCP/mcp_stdio_server.py"],
         "cwd": "/home/user/gitrepos/discussWithGrokMCP",
         "env": {
-            "XAI_API_KEY": "test_api_key_placeholder",
+            "XAI_API_KEY": os.getenv("XAI_API_KEY", "test_api_key_placeholder"),
             "PYTHONUNBUFFERED": "1"
         }
     }
