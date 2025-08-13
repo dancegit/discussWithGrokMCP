@@ -13,6 +13,21 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
+# Debug: Log current working directory and environment
+debug_info = {
+    "cwd": os.getcwd(),
+    "script_path": __file__,
+    "python_path": sys.path,
+    "env_XAI_API_KEY": "SET" if os.getenv("XAI_API_KEY") else "NOT SET"
+}
+
+# Write debug info to stderr (won't interfere with stdio protocol)
+sys.stderr.write(f"DEBUG: MCP Server Starting\n")
+sys.stderr.write(f"DEBUG: CWD: {debug_info['cwd']}\n")
+sys.stderr.write(f"DEBUG: Script: {debug_info['script_path']}\n")
+sys.stderr.write(f"DEBUG: API Key: {debug_info['env_XAI_API_KEY']}\n")
+sys.stderr.flush()
+
 # Add lib to path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -28,14 +43,22 @@ from lib import (
 load_dotenv()
 
 # Configure logging to file only
+log_file_path = Path(__file__).parent / 'grok_mcp_server.log'
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Changed to DEBUG for more detail
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('grok_mcp_server.log')
+        logging.FileHandler(log_file_path)
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Log startup details
+logger.debug(f"Starting Grok MCP Server")
+logger.debug(f"Current working directory: {os.getcwd()}")
+logger.debug(f"Script path: {__file__}")
+logger.debug(f"Python path: {sys.path}")
+logger.debug(f"Environment XAI_API_KEY: {'SET' if os.getenv('XAI_API_KEY') else 'NOT SET'}")
 
 
 class GrokMCPServer:
