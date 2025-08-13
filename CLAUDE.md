@@ -19,7 +19,7 @@ Create a `.env` file in the project root with:
 XAI_API_KEY=your_api_key_here
 
 # Optional for enhanced server
-GROK_MODEL=grok-2-1212
+GROK_MODEL=grok-4-0709
 GROK_TEMPERATURE=0.7
 MAX_CONTEXT_TOKENS=10000
 DEFAULT_MAX_ITERATIONS=3

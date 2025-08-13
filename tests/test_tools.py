@@ -27,7 +27,7 @@ class TestAskTool:
         client.ask = AsyncMock(return_value=GrokResponse(
             content="Test response",
             tokens_used=10,
-            model="grok-2-1212",
+            model="grok-4-0709",
             timestamp=1234567890
         ))
         return client
@@ -134,7 +134,7 @@ class TestDiscussTool:
         client.ask_with_history = AsyncMock(return_value=GrokResponse(
             content="Discussion response",
             tokens_used=20,
-            model="grok-2-1212",
+            model="grok-4-0709",
             timestamp=1234567890
         ))
         return client
@@ -182,7 +182,7 @@ class TestContextTool:
         client.ask = AsyncMock(return_value=GrokResponse(
             content="Context response",
             tokens_used=30,
-            model="grok-2-1212",
+            model="grok-4-0709",
             timestamp=1234567890
         ))
         return client
@@ -235,7 +235,7 @@ class TestHealthCheckTool:
         client.ask = AsyncMock(return_value=GrokResponse(
             content="pong",
             tokens_used=1,
-            model="grok-2-1212",
+            model="grok-4-0709",
             timestamp=1234567890
         ))
         return client
