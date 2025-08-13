@@ -1,30 +1,10 @@
 # Grok MCP Server
 
-A standalone Model Context Protocol (MCP) server for intelligent discussions with Grok-4 AI. Features context-aware conversations, baseline document generation, and comprehensive response management.
+A standalone Model Context Protocol (MCP) server for Claude Code that enables direct interaction with Grok AI. Simple, reliable implementation that works with Claude Code CLI.
 
 ## Installation in Claude Code
 
-### Method 1: Global Configuration
-
-Add to your Claude Code configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
-
-```json
-{
-  "mcpServers": {
-    "grok": {
-      "command": "uv",
-      "args": ["run", "python", "mcp_stdio_server.py"],
-      "cwd": "/absolute/path/to/discussWithGrokMCP",
-      "env": {
-        "XAI_API_KEY": "your_xai_api_key_here",
-        "PYTHONUNBUFFERED": "1"
-      }
-    }
-  }
-}
-```
-
-### Method 2: Project-Specific Configuration
+### Project-Specific Configuration (Recommended)
 
 Create a `.mcp.json` file in your project root:
 
@@ -32,19 +12,43 @@ Create a `.mcp.json` file in your project root:
 {
   "mcpServers": {
     "grok": {
-      "command": "uv",
-      "args": ["run", "python", "mcp_stdio_server.py"],
-      "cwd": "/absolute/path/to/discussWithGrokMCP",
-      "env": {
-        "XAI_API_KEY": "your_xai_api_key_here",
-        "PYTHONUNBUFFERED": "1"
-      }
+      "type": "stdio",
+      "command": "/path/to/.local/bin/uv",
+      "args": [
+        "--project",
+        "/absolute/path/to/discussWithGrokMCP",
+        "run",
+        "/absolute/path/to/discussWithGrokMCP/simple_mcp.py"
+      ],
+      "env": {}
     }
   }
 }
 ```
 
-### Method 3: Using Python Directly
+### Global Configuration
+
+Add to your Claude Code configuration file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "grok": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--project",
+        "/absolute/path/to/discussWithGrokMCP",
+        "run",
+        "/absolute/path/to/discussWithGrokMCP/simple_mcp.py"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+### Using Python Directly
 
 If you don't have `uv` installed, you can use Python directly:
 
@@ -52,10 +56,10 @@ If you don't have `uv` installed, you can use Python directly:
 {
   "mcpServers": {
     "grok": {
+      "type": "stdio",
       "command": "python",
-      "args": ["/absolute/path/to/discussWithGrokMCP/mcp_stdio_server.py"],
+      "args": ["/absolute/path/to/discussWithGrokMCP/simple_mcp.py"],
       "env": {
-        "XAI_API_KEY": "your_xai_api_key_here",
         "PYTHONPATH": "/absolute/path/to/discussWithGrokMCP"
       }
     }
@@ -65,33 +69,32 @@ If you don't have `uv` installed, you can use Python directly:
 
 ### Configuration Options
 
+- **type**: Must be "stdio" for Claude Code compatibility
 - **command**: The executable to run (`uv` recommended, or `python`/`python3`)
 - **args**: Command arguments to start the server
-- **cwd**: Working directory (must be absolute path to this repository)
-- **env**: Environment variables including your X.AI API key
+- **env**: Environment variables (API key is loaded from local .env file)
 
 ### Getting Your API Key
 
 1. Visit [console.x.ai](https://console.x.ai)
 2. Create an account or sign in
 3. Generate an API key
-4. Replace `your_xai_api_key_here` in the configuration
+4. Add it to `.env` file in the repository root:
+   ```bash
+   echo "XAI_API_KEY=your_api_key_here" > .env
+   ```
 
 ### Verifying Installation
 
-After adding the configuration and restarting Claude Code, you should see the Grok MCP server tools available:
-- `grok_ask` - Quick questions with context
-- `grok_discuss` - Multi-turn discussions
-- `grok_list_sessions` - View past sessions
+After adding the configuration and restarting Claude Code, you should see the Grok MCP server available with:
+- `grok_ask` - Ask Grok a question
 
 ## Features
 
-- 🤖 **Intelligent Context Gathering** - NLP-enhanced context detection with semantic analysis
-- 📄 **Baseline Document Generation** - Structured analysis documents for complex discussions
-- 💬 **Iterative Discussions** - Multi-round conversations with state tracking
-- 💾 **Session Management** - Checkpointing, crash recovery, and session persistence
+- 🤖 **Direct Grok Integration** - Simple access to Grok-2-1212 model via X.AI API
+- 🚀 **Lightweight Implementation** - Minimal, reliable MCP server that just works
 - 🔒 **Secure & Standalone** - Local .env configuration, no global dependencies
-- 📊 **Quality Scoring** - Automatic response quality assessment
+- ✅ **Claude Code Compatible** - Tested and working with Claude Code CLI
 
 ## Quick Start
 
@@ -136,102 +139,58 @@ pip install -e .
 
 Test the installation:
 ```bash
-# Test all components with real API
-uv run python test_integration.py
+# Test the MCP server
+uv run python test_simple.py
 
-# Test MCP server directly
-uv run python test_direct.py
+# Quick test with direct input
+echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | uv run ./simple_mcp.py
 ```
 
 ## MCP Tools
 
 ### `grok_ask`
-Quick single-turn questions with automatic context gathering.
+Ask Grok a question directly.
 
 **Parameters:**
 - `question` (string, required): The question to ask
-- `include_context` (boolean): Auto-gather relevant context (default: true)
-- `context_files` (array): Specific files to include
-- `stream` (boolean): Stream the response (default: true)
 
 **Example:**
 ```json
 {
   "name": "grok_ask",
   "arguments": {
-    "question": "How do I implement WebSocket in Python?",
-    "include_context": true
+    "question": "How do I implement WebSocket in Python?"
   }
 }
 ```
-
-### `grok_discuss`
-Start an iterative discussion with baseline preparation.
-
-**Parameters:**
-- `topic` (string, required): Discussion topic
-- `max_iterations` (integer): Maximum rounds (default: 3)
-- `use_baseline` (boolean): Generate baseline document (default: true)
-- `expert_mode` (boolean): Include expert perspectives (default: false)
-
-**Example:**
-```json
-{
-  "name": "grok_discuss",
-  "arguments": {
-    "topic": "Design a scalable microservices architecture",
-    "max_iterations": 5,
-    "expert_mode": true
-  }
-}
-```
-
-### `grok_list_sessions`
-List all discussion sessions.
-
-**Parameters:**
-- `status` (string): Filter by status (active/completed/failed/paused)
-- `limit` (integer): Maximum sessions to return (default: 10)
 
 ## Project Structure
 
 ```
 discussWithGrokMCP/
-├── lib/                          # Core modules
-│   ├── grok_client.py           # X.AI API wrapper
-│   ├── storage_manager.py      # Persistence layer
-│   ├── session_manager.py      # Session state management
-│   ├── context_analyzer.py     # Intelligent context gathering
-│   └── baseline_generator.py   # Baseline document creation
-├── grok_discussions/            # Local storage
-│   ├── sessions/               # Active sessions
-│   ├── responses/              # Saved responses
-│   └── baselines/              # Baseline documents
-├── mcp_server.py               # MCP server implementation
-├── test_integration.py         # Integration tests
-├── test_direct.py              # Direct component tests
-├── .env                        # API configuration
-└── pyproject.toml              # Dependencies
+├── lib/                        # Core modules
+│   └── grok_client.py         # X.AI API wrapper
+├── simple_mcp.py              # MCP server implementation
+├── test_simple.py             # Test script
+├── simple_mcp.log             # Server logs
+├── .env                       # API configuration
+└── pyproject.toml             # Dependencies
 ```
 
 ## Architecture
 
-### Core Components
-
-1. **Grok Client** - Handles X.AI API communication with retry logic and streaming
-2. **Storage Manager** - Manages local persistence of sessions, responses, and baselines
-3. **Session Manager** - Tracks discussion state with checkpointing and recovery
-4. **Context Analyzer** - NLP-enhanced context detection and relevance scoring
-5. **Baseline Generator** - Creates structured analysis documents
+The server (`simple_mcp.py`) implements a minimal MCP server that:
+1. Handles MCP protocol initialization 
+2. Lists available tools (currently just `grok_ask`)
+3. Executes tool calls by forwarding questions to the Grok API
+4. Returns responses in MCP-compatible format
 
 ### Data Flow
 
-1. **Question Analysis** → Detect type, extract keywords and entities
-2. **Context Gathering** → Find relevant files and documentation
-3. **Baseline Generation** → Create structured analysis document
-4. **API Communication** → Send to Grok with retry logic
-5. **Response Storage** → Persist with metadata and quality scoring
-6. **Session Management** → Track state and enable continuation
+1. **MCP Request** → Claude Code sends JSON-RPC request via stdio
+2. **Request Handling** → Server parses and routes the request
+3. **API Communication** → For tool calls, forwards to Grok API
+4. **Response** → Returns JSON-RPC response to Claude Code
 
 ## Configuration
 
@@ -243,87 +202,50 @@ Create a `.env` file with:
 # Required
 XAI_API_KEY=your_api_key_here
 
-# Optional
+# Optional (defaults shown)
 GROK_MODEL=grok-2-1212
 GROK_TEMPERATURE=0.7
-MAX_CONTEXT_TOKENS=10000
-DEFAULT_MAX_ITERATIONS=3
-STORAGE_PATH=./grok_discussions
-ENABLE_STREAMING=true
 ```
 
 ## Testing
 
-### Unit Tests
+Test the server directly:
+
 ```bash
-uv run python -m pytest tests/
+# Test initialization
+echo '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}' | uv run ./simple_mcp.py
+
+# Test with the test script
+uv run python test_simple.py
 ```
-
-### Integration Test
-```bash
-uv run python test_integration.py
-```
-
-### Direct Component Test
-```bash
-uv run python test_direct.py
-```
-
-## Response Storage
-
-Responses are stored locally in:
-- `grok_discussions/sessions/` - Session state files
-- `grok_discussions/responses/` - Individual responses
-- `grok_discussions/baselines/` - Generated baseline documents
-
-## Features in Detail
-
-### Intelligent Context Gathering
-- Analyzes questions to determine type (implementation, debugging, optimization)
-- Extracts keywords, entities, and file references
-- Scores context relevance using multiple factors
-- Manages token budget automatically
-
-### Baseline Document Generation
-- Creates structured analysis documents
-- Includes problem analysis, requirements, and success criteria
-- Optional expert perspectives from multiple viewpoints
-- Token-aware document assembly
-
-### Session Management
-- Atomic session operations with versioning
-- Periodic checkpointing (every 60 seconds)
-- Crash recovery from last checkpoint
-- Quality scoring for responses
-- Support for pausing and resuming sessions
-
-## Performance
-
-- **Response Time**: <500ms for simple questions
-- **Token Efficiency**: Intelligent context selection within budget
-- **Reliability**: Automatic retry with exponential backoff
-- **Storage**: Local persistence with search capabilities
 
 ## Security
 
-- API keys stored securely in `.env` file
+- API keys stored securely in `.env` file (not in MCP configuration)
 - No global configuration dependencies
-- File access sandboxed to project directory
-- Sensitive data detection and masking
+- Simple, auditable codebase
 
 ## Troubleshooting
 
-### API Key Issues
-- Ensure `XAI_API_KEY` is set in `.env` file
+### Server fails to start
+- Check that your API key is correctly set in `.env` file
 - Verify key at [console.x.ai](https://console.x.ai)
+- Ensure `uv` is installed and in your PATH
+
+### Claude Code shows "failed"
+- Restart Claude Code after configuration changes
+- Check paths in `.mcp.json` are absolute and correct
+- Review `simple_mcp.log` for error messages
 
 ### Import Errors
-- Install dependencies: `uv sync` or `pip install -e .`
+- Install dependencies: `uv sync`
 - Ensure Python 3.11+ is installed
 
-### Storage Issues
-- Check write permissions for `grok_discussions/` directory
-- Clear old sessions: `rm -rf grok_discussions/sessions/*`
+## Version History
+
+- **v0.3.0** - Simplified implementation (`simple_mcp.py`) that works reliably with Claude Code CLI
+- **v0.2.0** - MCP SDK-based implementation (had compatibility issues with Claude Code)
+- **v0.1.x** - Initial custom stdio implementations
 
 ## License
 
