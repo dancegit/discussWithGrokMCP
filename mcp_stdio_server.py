@@ -21,12 +21,12 @@ debug_info = {
     "env_XAI_API_KEY": "SET" if os.getenv("XAI_API_KEY") else "NOT SET"
 }
 
-# Write debug info to stderr (won't interfere with stdio protocol)
-sys.stderr.write(f"DEBUG: MCP Server Starting\n")
-sys.stderr.write(f"DEBUG: CWD: {debug_info['cwd']}\n")
-sys.stderr.write(f"DEBUG: Script: {debug_info['script_path']}\n")
-sys.stderr.write(f"DEBUG: API Key: {debug_info['env_XAI_API_KEY']}\n")
-sys.stderr.flush()
+# Write debug info to log file instead of stderr to avoid interference
+with open('/tmp/mcp_debug.log', 'w') as f:
+    f.write(f"DEBUG: MCP Server Starting\n")
+    f.write(f"DEBUG: CWD: {debug_info['cwd']}\n")
+    f.write(f"DEBUG: Script: {debug_info['script_path']}\n")
+    f.write(f"DEBUG: API Key: {debug_info['env_XAI_API_KEY']}\n")
 
 # Add lib to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -224,7 +224,12 @@ class GrokMCPServer:
 
 async def main():
     """Main entry point - handle stdio communication."""
-    server = GrokMCPServer()
+    try:
+        server = GrokMCPServer()
+        logger.info("Server created, entering main loop")
+    except Exception as e:
+        logger.error(f"Failed to create server: {e}")
+        return
     
     # Read from stdin and write to stdout
     while True:
@@ -233,12 +238,15 @@ async def main():
             line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
             
             if not line:
+                logger.info("EOF received, exiting")
                 break
                 
             # Parse JSON-RPC request
             try:
                 request = json.loads(line)
-            except json.JSONDecodeError:
+                logger.debug(f"Received request: {request.get('method', 'unknown')}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse JSON: {e}")
                 continue
             
             # Handle request
@@ -248,11 +256,13 @@ async def main():
             if response:
                 sys.stdout.write(json.dumps(response) + "\n")
                 sys.stdout.flush()
+                logger.debug(f"Sent response for {request.get('method', 'unknown')}")
                 
         except KeyboardInterrupt:
+            logger.info("Keyboard interrupt, exiting")
             break
         except Exception as e:
-            logger.error(f"Error in main loop: {e}")
+            logger.error(f"Error in main loop: {e}", exc_info=True)
             # Send error response
             error_response = {
                 "jsonrpc": "2.0",
