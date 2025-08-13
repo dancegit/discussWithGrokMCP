@@ -93,6 +93,7 @@ class GrokMCPServer:
             if method == "initialize":
                 result = await self._handle_initialize(params)
             elif method == "initialized":
+                logger.debug("Received 'initialized' notification")
                 return None  # No response for notification
             elif method == "tools/list":
                 result = await self._handle_list_tools()
@@ -239,9 +240,16 @@ async def main():
             line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
             
             if not line:
-                # Don't exit on EOF, just continue waiting
-                logger.debug("Empty line received, continuing")
+                # Check if stdin is closed
+                if sys.stdin.closed:
+                    logger.info("Stdin closed, exiting")
+                    break
+                # Empty line but stdin still open - just continue
                 await asyncio.sleep(0.1)
+                continue
+            
+            # Skip empty lines (just whitespace)
+            if not line.strip():
                 continue
                 
             # Parse JSON-RPC request
