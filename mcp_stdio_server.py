@@ -13,6 +13,10 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
+# Load .env from script directory, not CWD
+env_path = Path(__file__).parent / '.env'
+load_dotenv(env_path)
+
 # Debug: Log current working directory and environment
 debug_info = {
     "cwd": os.getcwd(),
@@ -38,9 +42,6 @@ from lib import (
     ContextAnalyzer,
     BaselineGenerator,
 )
-
-# Load environment variables
-load_dotenv()
 
 # Configure logging to file only
 log_file_path = Path(__file__).parent / 'grok_mcp_server.log'
@@ -238,8 +239,10 @@ async def main():
             line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
             
             if not line:
-                logger.info("EOF received, exiting")
-                break
+                # Don't exit on EOF, just continue waiting
+                logger.debug("Empty line received, continuing")
+                await asyncio.sleep(0.1)
+                continue
                 
             # Parse JSON-RPC request
             try:
