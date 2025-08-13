@@ -6,7 +6,7 @@ A powerful Model Context Protocol (MCP) server for Claude Code that enables dire
 
 ### Simple Version (`simple_mcp.py`)
 - ✅ **Proven Stable** - Lightweight implementation that just works
-- 🤖 **Direct Grok Integration** - Simple access to Grok-2-1212 model
+- 🤖 **Direct Grok Integration** - Simple access to Grok-4 model
 - 🔒 **Secure** - Local .env configuration
 
 ### Enhanced Version (`enhanced_mcp.py`) - NEW!
@@ -160,7 +160,7 @@ Create a `.env` file with:
 XAI_API_KEY=your_api_key_here
 
 # Optional (enhanced server)
-GROK_MODEL=grok-2-1212
+GROK_MODEL=grok-4-0709
 GROK_TEMPERATURE=0.7
 GROK_MAX_TOKENS=4096
 MCP_LOG_LEVEL=INFO
@@ -171,9 +171,10 @@ MCP_CACHE_TTL=3600
 
 ### Available Models
 
-- `grok-2-1212` (default)
-- `grok-2-vision`
-- `grok-beta`
+- `grok-4-0709` (default) - Latest and most capable model
+- `grok-2-1212` - Previous generation model
+- `grok-2-vision` - Vision-capable model
+- `grok-beta` - Experimental features
 
 ## 🧪 Testing
 

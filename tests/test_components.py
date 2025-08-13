@@ -27,14 +27,14 @@ class TestGrokResponse:
         response = GrokResponse(
             content="Test response",
             tokens_used=100,
-            model="grok-2-1212",
+            model="grok-4-0709",
             timestamp=time.time(),
             streaming=False
         )
         
         assert response.content == "Test response"
         assert response.tokens_used == 100
-        assert response.model == "grok-2-1212"
+        assert response.model == "grok-4-0709"
         assert not response.streaming
     
     def test_response_to_dict(self):
@@ -42,7 +42,7 @@ class TestGrokResponse:
         response = GrokResponse(
             content="Test",
             tokens_used=50,
-            model="grok-2-1212",
+            model="grok-4-0709",
             timestamp=1234567890.0
         )
         
