@@ -1,0 +1,36 @@
+{
+  "id": "discuss_20250813_094601_87a6a790",
+  "topic": "Test Discussion",
+  "status": "active",
+  "created": "2025-08-13T09:46:01.485946",
+  "max_iterations": 3,
+  "iterations_completed": 1,
+  "has_baseline": false,
+  "baseline_path": null,
+  "responses": [
+    {
+      "iteration": 0,
+      "content": "Test response",
+      "tokens": 100,
+      "timestamp": 1755074761.4868276
+    }
+  ],
+  "context_files": [],
+  "total_tokens": 100,
+  "quality_scores": [],
+  "checkpoints": [
+    {
+      "timestamp": "2025-08-13T09:46:01.486415",
+      "iteration": 0,
+      "status": "active",
+      "tokens_used": 0,
+      "responses_count": 0
+    }
+  ],
+  "last_checkpoint": "2025-08-13T09:46:01.486415",
+  "metadata": {
+    "type": "discuss",
+    "version": "1.0.0"
+  },
+  "saved_at": "2025-08-13T09:46:01.486849"
+}

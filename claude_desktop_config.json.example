@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "grok": {
+      "command": "uv",
+      "args": ["run", "python", "mcp_server.py"],
+      "cwd": "/absolute/path/to/discussWithGrokMCP",
+      "env": {
+        "XAI_API_KEY": "your_xai_api_key_here"
+      }
+    },
+    "other-server": {
+      "comment": "You can have multiple MCP servers configured"
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "version": "1.0.0",
+  "created": "2025-08-13T09:38:17.266174",
+  "sessions": {
+    "test_session_001": {
+      "path": "grok_discussions/sessions/test_session_001.json",
+      "saved_at": "2025-08-13T09:46:01.484249",
+      "topic": "Test Topic"
+    },
+    "discuss_20250813_093817_6f1f7fe4": {
+      "path": "grok_discussions/sessions/discuss_20250813_093817_6f1f7fe4.json",
+      "saved_at": "2025-08-13T09:38:17.271089",
+      "topic": "Test Discussion"
+    },
+    "discuss_20250813_093817_e1faa82d": {
+      "path": "grok_discussions/sessions/discuss_20250813_093817_e1faa82d.json",
+      "saved_at": "2025-08-13T09:38:18.226428",
+      "topic": "What is the capital of France? Give a brief answer."
+    },
+    "discuss_20250813_094310_eeef5a05": {
+      "path": "grok_discussions/sessions/discuss_20250813_094310_eeef5a05.json",
+      "saved_at": "2025-08-13T09:43:15.693098",
+      "topic": "What are the benefits of async programming in Python? Give 3 bullet points."
+    },
+    "discuss_20250813_094601_87a6a790": {
+      "path": "grok_discussions/sessions/discuss_20250813_094601_87a6a790.json",
+      "saved_at": "2025-08-13T09:46:01.486849",
+      "topic": "Test Discussion"
+    },
+    "discuss_20250813_094601_ba6dc80b": {
+      "path": "grok_discussions/sessions/discuss_20250813_094601_ba6dc80b.json",
+      "saved_at": "2025-08-13T09:46:02.385467",
+      "topic": "What is the capital of France? Give a brief answer."
+    }
+  },
+  "total_sessions": 14,
+  "total_responses": 6,
+  "index": {
+    "responses": {
+      "c82b954a": {
+        "session_id": "test_session_001",
+        "iteration": 1,
+        "path": "grok_discussions/responses/response_test_session_001_1_20250813_094601.md",
+        "timestamp": "20250813_094601"
+      },
+      "4804f8d3": {
+        "session_id": "discuss_20250813_094601_ba6dc80b",
+        "iteration": 1,
+        "path": "grok_discussions/responses/response_discuss_20250813_094601_ba6dc80b_1_20250813_094602.md",
+        "timestamp": "20250813_094602"
+      },
+      "62413a57": {
+        "session_id": "ask_20250813_094310_6a7c301b",
+        "iteration": 0,
+        "path": "grok_discussions/responses/response_ask_20250813_094310_6a7c301b_0_20250813_094310.md",
+        "timestamp": "20250813_094310"
+      },
+      "dc4e8a95": {
+        "session_id": "discuss_20250813_094310_eeef5a05",
+        "iteration": 1,
+        "path": "grok_discussions/responses/response_discuss_20250813_094310_eeef5a05_1_20250813_094315.md",
+        "timestamp": "20250813_094315"
+      }
+    },
+    "baselines": {
+      "discuss_20250813_093817_e1faa82d": {
+        "topic": "What is the capital of France? Give a brief answer.",
+        "path": "grok_discussions/baselines/baseline_discuss_20250813_093817_e1faa82d_20250813_093817.md",
+        "timestamp": "20250813_093817"
+      },
+      "discuss_20250813_094601_ba6dc80b": {
+        "topic": "What is the capital of France? Give a brief answer.",
+        "path": "grok_discussions/baselines/baseline_discuss_20250813_094601_ba6dc80b_20250813_094601.md",
+        "timestamp": "20250813_094601"
+      }
+    }
+  }
+}

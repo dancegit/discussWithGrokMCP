@@ -1,0 +1,28 @@
+{
+  "id": "discuss_20250813_094601_ba6dc80b",
+  "topic": "What is the capital of France? Give a brief answer.",
+  "status": "completed",
+  "created": "2025-08-13T09:46:01.502888",
+  "max_iterations": 1,
+  "iterations_completed": 1,
+  "has_baseline": false,
+  "baseline_path": null,
+  "responses": [
+    {
+      "iteration": 0,
+      "content": "The capital of France is Paris.",
+      "tokens": 180,
+      "timestamp": 1755074762.3854203
+    }
+  ],
+  "context_files": [],
+  "total_tokens": 180,
+  "quality_scores": [],
+  "checkpoints": [],
+  "last_checkpoint": null,
+  "metadata": {
+    "type": "discuss",
+    "version": "1.0.0"
+  },
+  "saved_at": "2025-08-13T09:46:02.385467"
+}

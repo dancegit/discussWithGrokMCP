@@ -1,0 +1,36 @@
+# Environment variables
+.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+grok_mcp_server.log
+
+# Test outputs
+test_storage/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific - keep example configs
+!*.example
+!.mcp.json.example
+!claude_desktop_config.json.example

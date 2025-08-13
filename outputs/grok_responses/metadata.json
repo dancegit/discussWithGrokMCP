@@ -1,0 +1,16 @@
+{
+  "responses": {
+    "grok-export-20250813_090328-implementation": {
+      "timestamp": "2025-08-13T09:03:28.908843",
+      "status": "running",
+      "context": "implementation",
+      "title": "Implement: Review this MCP server specificatio...",
+      "output_file": "/home/per/gitrepos/discussWithGrokMCP/outputs/grok_responses/pending/grok_response_20250813_090328_implementation.md",
+      "reviewed": false
+    }
+  },
+  "last_checked": null,
+  "total_pending": 1,
+  "total_reviewed": 0,
+  "version": "1.0.0"
+}
