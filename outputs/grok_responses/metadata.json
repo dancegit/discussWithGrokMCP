@@ -15,10 +15,18 @@
       "title": "Implement: MCP server startup issue: The Grok ...",
       "output_file": "/home/per/gitrepos/discussWithGrokMCP/outputs/grok_responses/pending/grok_response_20250813_142039_implementation.md",
       "reviewed": false
+    },
+    "grok-export-20250813_144233-implementation": {
+      "timestamp": "2025-08-13T14:42:33.708591",
+      "status": "running",
+      "context": "implementation",
+      "title": "Implement: MCP server issue: We built a Grok M...",
+      "output_file": "/home/per/gitrepos/discussWithGrokMCP/outputs/grok_responses/pending/grok_response_20250813_144233_implementation.md",
+      "reviewed": false
     }
   },
-  "last_checked": "2025-08-13T14:21:49.031472",
-  "total_pending": 2,
+  "last_checked": "2025-08-13T14:42:53.408235",
+  "total_pending": 3,
   "total_reviewed": 0,
   "version": "1.0.0"
 }
