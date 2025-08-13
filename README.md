@@ -13,10 +13,11 @@ Add to your Claude Code configuration file (`~/Library/Application Support/Claud
   "mcpServers": {
     "grok": {
       "command": "uv",
-      "args": ["run", "python", "mcp_server.py"],
+      "args": ["run", "python", "mcp_stdio_server.py"],
       "cwd": "/absolute/path/to/discussWithGrokMCP",
       "env": {
-        "XAI_API_KEY": "your_xai_api_key_here"
+        "XAI_API_KEY": "your_xai_api_key_here",
+        "PYTHONUNBUFFERED": "1"
       }
     }
   }
@@ -32,10 +33,11 @@ Create a `.mcp.json` file in your project root:
   "mcpServers": {
     "grok": {
       "command": "uv",
-      "args": ["run", "python", "mcp_server.py"],
+      "args": ["run", "python", "mcp_stdio_server.py"],
       "cwd": "/absolute/path/to/discussWithGrokMCP",
       "env": {
-        "XAI_API_KEY": "your_xai_api_key_here"
+        "XAI_API_KEY": "your_xai_api_key_here",
+        "PYTHONUNBUFFERED": "1"
       }
     }
   }
@@ -51,7 +53,7 @@ If you don't have `uv` installed, you can use Python directly:
   "mcpServers": {
     "grok": {
       "command": "python",
-      "args": ["/absolute/path/to/discussWithGrokMCP/mcp_server.py"],
+      "args": ["/absolute/path/to/discussWithGrokMCP/mcp_stdio_server.py"],
       "env": {
         "XAI_API_KEY": "your_xai_api_key_here",
         "PYTHONPATH": "/absolute/path/to/discussWithGrokMCP"
