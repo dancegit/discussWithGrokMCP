@@ -51,15 +51,35 @@ class StdioProtocol:
         """Start reading from stdin and writing to stdout."""
         # Create streams for stdin/stdout
         loop = asyncio.get_event_loop()
-        self.reader = asyncio.StreamReader()
-        protocol = asyncio.StreamReaderProtocol(self.reader)
-        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
         
-        # Writer for stdout
-        w_transport, w_protocol = await loop.connect_write_pipe(
-            asyncio.streams.FlowControlMixin, sys.stdout
-        )
-        self.writer = asyncio.StreamWriter(w_transport, w_protocol, self.reader, loop)
+        try:
+            # Try to set up stdio pipes
+            self.reader = asyncio.StreamReader()
+            protocol = asyncio.StreamReaderProtocol(self.reader)
+            
+            # Check if stdin is a pipe/terminal
+            if not sys.stdin.isatty():
+                await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+            else:
+                # If running in terminal, use a different approach
+                import io
+                self.reader = asyncio.StreamReader()
+                protocol = asyncio.StreamReaderProtocol(self.reader)
+                transport, _ = await loop.connect_read_pipe(
+                    lambda: protocol, 
+                    io.TextIOWrapper(io.BufferedReader(io.FileIO(sys.stdin.fileno(), 'r')), encoding='utf-8')
+                )
+            
+            # Writer for stdout
+            w_transport, w_protocol = await loop.connect_write_pipe(
+                asyncio.streams.FlowControlMixin, sys.stdout
+            )
+            self.writer = asyncio.StreamWriter(w_transport, w_protocol, self.reader, loop)
+        except Exception as e:
+            logger.error(f"Failed to set up stdio: {e}")
+            # Fallback to direct stdio
+            self.reader = sys.stdin
+            self.writer = sys.stdout
         
         # Start processing messages
         await self.process_messages()
