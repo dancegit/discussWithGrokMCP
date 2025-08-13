@@ -263,3 +263,52 @@ class GrokClient:
     def reset_token_counter(self):
         """Reset the total token counter."""
         self.total_tokens_used = 0
+    
+    async def ask_with_history(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stream: bool = False
+    ) -> GrokResponse:
+        """Send a conversation with history to Grok.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            model: Optional model override
+            temperature: Optional temperature override
+            max_tokens: Maximum tokens in response
+            stream: Whether to stream the response
+            
+        Returns:
+            GrokResponse object with content and metadata
+        """
+        # Convert to proper message format
+        formatted_messages: List[ChatCompletionMessageParam] = []
+        for msg in messages:
+            formatted_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+        
+        # Use provided parameters or defaults
+        actual_model = model or self.model
+        actual_temp = temperature if temperature is not None else self.temperature
+        
+        # Temporarily update instance values
+        old_model = self.model
+        old_temp = self.temperature
+        self.model = actual_model
+        self.temperature = actual_temp
+        
+        try:
+            if stream:
+                response = await self._stream_completion(formatted_messages, max_tokens)
+            else:
+                response = await self._complete(formatted_messages, max_tokens)
+            return response
+        finally:
+            # Restore original values
+            self.model = old_model
+            self.temperature = old_temp
