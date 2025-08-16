@@ -273,6 +273,15 @@ class EnhancedMCPServer:
                     'timestamp': datetime.now()
                 }
             
+            # Check response size and truncate if necessary
+            max_response_tokens = int(os.getenv('MCP_MAX_RESPONSE_TOKENS', '40000'))
+            estimated_tokens = self._estimate_tokens(result)
+            
+            if estimated_tokens > max_response_tokens:
+                logger.warning(f"Response size ({estimated_tokens} tokens) exceeds limit ({max_response_tokens} tokens). Truncating...")
+                result = self._truncate_response(result, max_response_tokens)
+                result += f"\n\n[Response truncated. Original size: ~{estimated_tokens} tokens, limit: {max_response_tokens} tokens]"
+            
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,
@@ -394,6 +403,45 @@ class EnhancedMCPServer:
             }
         else:
             raise ValueError(f"Unknown resource: {uri}")
+    
+    def _estimate_tokens(self, text: str) -> int:
+        """Estimate token count for a text string.
+        
+        Uses a simple heuristic: ~1 token per 4 characters.
+        This is a rough approximation that works reasonably well for English text.
+        """
+        return len(text) // 4
+    
+    def _truncate_response(self, text: str, max_tokens: int) -> str:
+        """Truncate response to fit within token limit.
+        
+        Attempts to truncate at a reasonable boundary (paragraph or sentence).
+        """
+        # Estimate character limit based on token limit
+        char_limit = max_tokens * 4
+        
+        if len(text) <= char_limit:
+            return text
+        
+        # Try to find a good truncation point
+        truncated = text[:char_limit]
+        
+        # Look for the last paragraph break
+        last_paragraph = truncated.rfind('\n\n')
+        if last_paragraph > char_limit * 0.8:  # If we found a paragraph break in the last 20%
+            return truncated[:last_paragraph]
+        
+        # Look for the last sentence
+        last_sentence = max(
+            truncated.rfind('. '),
+            truncated.rfind('! '),
+            truncated.rfind('? ')
+        )
+        if last_sentence > char_limit * 0.8:
+            return truncated[:last_sentence + 1]
+        
+        # Fall back to simple truncation
+        return truncated + "..."
 
 
 async def main():
