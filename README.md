@@ -94,11 +94,43 @@ grok_health
 | Tool | Description | Server |
 |------|-------------|---------|
 | `grok_ask` | Simple Q&A with Grok | Both |
-| `grok_discuss` | Multi-turn discussions | Enhanced |
-| `grok_ask_with_context` | Include files in queries | Enhanced |
+| `grok_discuss` | Multi-turn discussions with file context support | Enhanced |
+| `grok_ask_with_context` | Single question with file context | Enhanced |
 | `grok_list_sessions` | View conversation history | Enhanced |
 | `grok_continue_session` | Resume conversations | Enhanced |
 | `grok_health` | Monitor server status | Enhanced |
+
+### Tool Examples
+
+#### `grok_discuss` with File Context (NEW!)
+```python
+# Discuss code with file context
+grok_discuss(
+    topic="Review and optimize this implementation",
+    context_files=["app.py", "test_app.py"],
+    context_type="code",
+    max_turns=3,
+    expert_mode=True
+)
+
+# Discuss documentation
+grok_discuss(
+    topic="Explain this API design",
+    context_files=["api_spec.md", "openapi.yaml"],
+    context_type="docs",
+    max_turns=2
+)
+```
+
+#### `grok_ask_with_context`
+```python
+# Ask about specific code
+grok_ask_with_context(
+    question="What design patterns are used here?",
+    context_files=["src/main.py"],
+    context_type="code"
+)
+```
 
 ## 📚 Documentation
 

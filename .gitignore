@@ -1,7 +1,7 @@
 # Environment variables
 .env
 !.env.example
-
+.mcp.json
 # Python
 __pycache__/
 *.py[cod]

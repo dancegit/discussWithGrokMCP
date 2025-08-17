@@ -49,9 +49,9 @@ Complete implementation with modular architecture:
 
 1. **Tools Module** (`lib/tools/`)
    - `ask.py` - Basic question-answer tool (backward compatible)
-   - `discuss.py` - Multi-turn conversation management
+   - `discuss.py` - Multi-turn conversation management with file context support
    - `session.py` - Session persistence and management
-   - `context.py` - File-aware context handling
+   - `context.py` - File-aware context handling for single questions
    - `health.py` - Server health monitoring
 
 2. **Grok Client** (`lib/grok_client.py`)

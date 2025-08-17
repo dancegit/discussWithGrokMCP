@@ -1,8 +1,9 @@
 """
-Discussion tool for multi-turn conversations.
+Discussion tool for multi-turn conversations with file context support and pagination.
 """
 
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 from .base import BaseTool
 from .session import SessionManager
 import logging
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class DiscussTool(BaseTool):
-    """Tool for extended discussions with Grok."""
+    """Tool for extended discussions with Grok, supporting file context and pagination."""
     
     def __init__(self, grok_client, session_manager: SessionManager):
         super().__init__(grok_client)
@@ -37,6 +38,22 @@ class DiscussTool(BaseTool):
                 "context": {
                     "type": "string",
                     "description": "Optional context for the discussion"
+                },
+                "context_files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of file paths to include as context"
+                },
+                "context_type": {
+                    "type": "string",
+                    "description": "Type of context",
+                    "enum": ["code", "docs", "general"],
+                    "default": "general"
+                },
+                "max_context_lines": {
+                    "type": "integer",
+                    "description": "Maximum lines per file",
+                    "default": 100
                 },
                 "max_turns": {
                     "type": "integer",
@@ -77,20 +94,36 @@ class DiscussTool(BaseTool):
         }
     
     async def execute(self, topic: str, context: str = None, 
+                     context_files: List[str] = None,
+                     context_type: str = "general",
+                     max_context_lines: int = 100,
                      max_turns: int = 3, expert_mode: bool = False,
                      page: int = 1, turns_per_page: int = 2, 
                      paginate: bool = True, **kwargs) -> str:
-        """Start a discussion with pagination support."""
+        """Start a discussion with optional file context and pagination support."""
         try:
             # Create a new session or continue existing one
             session_id = kwargs.get('session_id')
             if not session_id:
                 session_id = self.session_manager.create_session(topic)
                 
+                # Build file context if provided
+                file_context = ""
+                if context_files:
+                    for file_path in context_files:
+                        file_context += self._read_file_context(file_path, max_context_lines)
+                
                 # Build initial prompt
                 initial_prompt = f"Let's discuss: {topic}"
+                
+                # Add file context first if provided
+                if file_context:
+                    initial_prompt = self._build_contextual_prompt(initial_prompt, file_context, context_type)
+                
+                # Add additional context if provided
                 if context:
-                    initial_prompt += f"\n\nContext: {context}"
+                    initial_prompt += f"\n\nAdditional context: {context}"
+                
                 if expert_mode:
                     initial_prompt += "\n\nPlease provide expert-level insights with multiple perspectives."
                 
@@ -103,6 +136,8 @@ class DiscussTool(BaseTool):
                 if not session:
                     return f"Error: Session {session_id} not found"
                 messages = session['messages']
+                # Extract context_files from kwargs if continuing a session
+                context_files = kwargs.get('context_files')
             
             # Calculate pagination
             if paginate:
@@ -120,6 +155,9 @@ class DiscussTool(BaseTool):
             # Start the discussion
             result = f"Discussion on: {topic}\n"
             result += f"Session ID: {session_id}\n"
+            
+            if context_files:
+                result += f"Context files: {', '.join(context_files)}\n"
             
             if paginate:
                 result += f"Page {page} of {total_pages} (Turns {start_turn + 1}-{end_turn} of {max_turns})\n"
@@ -158,9 +196,9 @@ class DiscussTool(BaseTool):
                 
                 result += f"Turn {turn + 1}:\n{response.content}\n\n"
                 
-                # Generate follow-up question if not last turn
-                if turn < max_turns - 1:
-                    follow_up = self._generate_follow_up(response.content, expert_mode)
+                # Generate follow-up question if not last turn on this page
+                if turn < end_turn - 1:
+                    follow_up = self._generate_follow_up(response.content, expert_mode, context_files is not None)
                     self.session_manager.add_message(session_id, "user", follow_up)
                     messages.append({"role": "user", "content": follow_up})
                     result += f"Follow-up: {follow_up}\n\n"
@@ -187,9 +225,46 @@ class DiscussTool(BaseTool):
             logger.error(f"Error in discussion: {e}")
             return f"Error: {str(e)}"
     
-    def _generate_follow_up(self, response: str, expert_mode: bool) -> str:
-        """Generate a follow-up question based on the response."""
-        if expert_mode:
-            return "Can you elaborate on the technical implications and potential edge cases?"
+    def _read_file_context(self, file_path: str, max_lines: int) -> str:
+        """Read context from a file."""
+        try:
+            path = Path(file_path)
+            if not path.exists():
+                return f"\n[File not found: {file_path}]\n"
+            
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()[:max_lines]
+                content = ''.join(lines)
+                
+            return f"\n--- File: {file_path} ---\n{content}\n--- End of {file_path} ---\n"
+            
+        except Exception as e:
+            logger.warning(f"Error reading {file_path}: {e}")
+            return f"\n[Error reading {file_path}: {e}]\n"
+    
+    def _build_contextual_prompt(self, base_prompt: str, file_context: str, context_type: str) -> str:
+        """Build a prompt with file context."""
+        if not file_context:
+            return base_prompt
+        
+        if context_type == "code":
+            prompt = f"Given the following code:\n{file_context}\n\n{base_prompt}"
+        elif context_type == "docs":
+            prompt = f"Based on this documentation:\n{file_context}\n\n{base_prompt}"
         else:
-            return "Can you provide more details or examples?"
+            prompt = f"Context:\n{file_context}\n\n{base_prompt}"
+        
+        return prompt
+    
+    def _generate_follow_up(self, response: str, expert_mode: bool, has_file_context: bool = False) -> str:
+        """Generate a follow-up question based on the response."""
+        if has_file_context:
+            if expert_mode:
+                return "How does this relate to the code structure and what optimizations or refactoring would you suggest?"
+            else:
+                return "Can you explain how this applies to the specific code we're discussing?"
+        else:
+            if expert_mode:
+                return "Can you elaborate on the technical implications and potential edge cases?"
+            else:
+                return "Can you provide more details or examples?"
