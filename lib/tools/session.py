@@ -178,20 +178,39 @@ class ContinueSessionTool(BaseTool):
                 "message": {
                     "type": "string",
                     "description": "Your message to continue the conversation"
+                },
+                "context_files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of file paths to include as context"
+                },
+                "max_context_lines": {
+                    "type": "integer",
+                    "description": "Maximum lines per file to include",
+                    "default": 500
                 }
             },
             "required": ["session_id", "message"]
         }
     
-    async def execute(self, session_id: str, message: str, **kwargs) -> str:
-        """Continue a session."""
+    async def execute(self, session_id: str, message: str, 
+                     context_files: List[str] = None, 
+                     max_context_lines: int = 500, **kwargs) -> str:
+        """Continue a session with optional file context."""
         try:
             session = self.session_manager.get_session(session_id)
             if not session:
                 return f"Session {session_id} not found"
             
+            # Build message with context if provided
+            full_message = message
+            if context_files:
+                context_content = self._load_context_files(context_files, max_context_lines)
+                if context_content:
+                    full_message = f"{message}\n\nContext from files:\n{context_content}"
+            
             # Add user message
-            self.session_manager.add_message(session_id, "user", message)
+            self.session_manager.add_message(session_id, "user", full_message)
             
             # Build conversation history
             messages = [{"role": msg["role"], "content": msg["content"]} 
@@ -211,3 +230,39 @@ class ContinueSessionTool(BaseTool):
         except Exception as e:
             logger.error(f"Error continuing session: {e}")
             return f"Error: {str(e)}"
+    
+    def _load_context_files(self, file_paths: List[str], max_lines: int) -> str:
+        """Load content from context files."""
+        context_parts = []
+        
+        for file_path in file_paths:
+            try:
+                path = Path(file_path)
+                if not path.exists():
+                    logger.warning(f"Context file not found: {file_path}")
+                    continue
+                
+                # Read file content
+                with open(path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                
+                # Truncate if necessary
+                if len(lines) > max_lines:
+                    lines = lines[:max_lines]
+                    truncated = True
+                else:
+                    truncated = False
+                
+                # Format context
+                content = ''.join(lines)
+                context_part = f"\n--- File: {file_path} ---\n{content}"
+                if truncated:
+                    context_part += f"\n[Truncated to {max_lines} lines]"
+                
+                context_parts.append(context_part)
+                
+            except Exception as e:
+                logger.error(f"Error reading context file {file_path}: {e}")
+                context_parts.append(f"\n--- File: {file_path} ---\nError reading file: {str(e)}")
+        
+        return '\n'.join(context_parts) if context_parts else ""
