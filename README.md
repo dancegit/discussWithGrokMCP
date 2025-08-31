@@ -100,11 +100,21 @@ grok_health
 | `grok_continue_session` | Resume conversations | Enhanced |
 | `grok_health` | Monitor server status | Enhanced |
 
+### File Context with Line Ranges
+
+All context-aware tools (`grok_discuss`, `grok_ask_with_context`, `grok_continue_session`) support specifying specific line ranges from files:
+
+- **String format**: `"path/to/file.py"` - includes the entire file
+- **Object format**: `{"path": "file.py", "from": 10, "to": 50}` - includes lines 10-50
+- **Mixed**: You can mix both formats in the same `context_files` array
+
+Line numbers are 1-based (matching standard editor line numbers). The `from` and `to` fields are optional - omit them to include the entire file.
+
 ### Tool Examples
 
-#### `grok_discuss` with File Context (NEW!)
+#### `grok_discuss` with File Context and Line Ranges
 ```python
-# Discuss code with file context
+# Discuss code with full file context
 grok_discuss(
     topic="Review and optimize this implementation",
     context_files=["app.py", "test_app.py"],
@@ -113,10 +123,24 @@ grok_discuss(
     expert_mode=True
 )
 
-# Discuss documentation
+# Discuss specific functions using line ranges
+grok_discuss(
+    topic="Review the authentication logic",
+    context_files=[
+        {"path": "auth.py", "from": 45, "to": 120},  # Auth class
+        {"path": "middleware.py", "from": 10, "to": 35}  # Auth middleware
+    ],
+    context_type="code",
+    max_turns=2
+)
+
+# Mix full files and specific sections
 grok_discuss(
     topic="Explain this API design",
-    context_files=["api_spec.md", "openapi.yaml"],
+    context_files=[
+        "api_spec.md",  # Full file
+        {"path": "openapi.yaml", "from": 50, "to": 150}  # Specific endpoints
+    ],
     context_type="docs",
     max_turns=2
 )
@@ -124,11 +148,34 @@ grok_discuss(
 
 #### `grok_ask_with_context`
 ```python
-# Ask about specific code
+# Ask about specific code sections
 grok_ask_with_context(
     question="What design patterns are used here?",
-    context_files=["src/main.py"],
+    context_files=[
+        {"path": "src/main.py", "from": 100, "to": 200}
+    ],
     context_type="code"
+)
+
+# Mix full files and line ranges
+grok_ask_with_context(
+    question="How do these components interact?",
+    context_files=[
+        "src/config.py",  # Full config file
+        {"path": "src/main.py", "from": 1, "to": 50}  # Just imports and setup
+    ]
+)
+```
+
+#### `grok_continue_session` with File Context
+```python
+# Continue a session with new file context
+grok_continue_session(
+    session_id="abc-123",
+    message="Now let's look at the error handling",
+    context_files=[
+        {"path": "errors.py", "from": 20, "to": 80}
+    ]
 )
 ```
 

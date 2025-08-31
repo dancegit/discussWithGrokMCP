@@ -170,6 +170,38 @@ class TestDiscussTool:
         
         assert "Code review" in result
         assert "Session ID:" in result
+    
+    @pytest.mark.asyncio
+    async def test_discuss_with_file_line_ranges(self, discuss_tool, tmp_path):
+        """Test discussion with file context using line ranges."""
+        # Create a test file
+        test_file = tmp_path / "example.py"
+        test_file.write_text("""# Line 1: Header comment
+def function_a():
+    # Line 3
+    return "a"
+
+def function_b():
+    # Line 7
+    return "b"
+
+def function_c():
+    # Line 11
+    return "c"
+""")
+        
+        result = await discuss_tool.execute(
+            topic="Review specific functions",
+            context_files=[
+                {"path": str(test_file), "from": 6, "to": 9},  # Only function_b
+            ],
+            context_type="code",
+            max_turns=1
+        )
+        
+        assert "Review specific functions" in result
+        assert "Session ID:" in result
+        assert "Context files:" in result
 
 
 class TestContextTool:
@@ -222,6 +254,60 @@ class TestContextTool:
         )
         
         # Should still work, just with error in context
+        assert result == "Context response"
+    
+    @pytest.mark.asyncio
+    async def test_file_with_line_range(self, context_tool, tmp_path):
+        """Test with file context and line ranges."""
+        # Create a test file with multiple lines
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""def function1():
+    return 1
+
+def function2():
+    return 2
+
+def function3():
+    return 3
+
+def function4():
+    return 4""")
+        
+        # Test with line range specification
+        result = await context_tool.execute(
+            question="What does this code do?",
+            context_files=[{
+                "path": str(test_file),
+                "from": 4,
+                "to": 6
+            }],
+            context_type="code"
+        )
+        
+        assert result == "Context response"
+    
+    @pytest.mark.asyncio
+    async def test_mixed_file_specifications(self, context_tool, tmp_path):
+        """Test with mixed string and object file specifications."""
+        # Create test files
+        file1 = tmp_path / "file1.py"
+        file1.write_text("# File 1 content\nline 2\nline 3\nline 4\nline 5")
+        
+        file2 = tmp_path / "file2.py"
+        file2.write_text("# File 2 content\nline 2\nline 3")
+        
+        result = await context_tool.execute(
+            question="Analyze these files",
+            context_files=[
+                str(file1),  # Simple string path
+                {
+                    "path": str(file2),
+                    "from": 2,
+                    "to": 3
+                }
+            ]
+        )
+        
         assert result == "Context response"
 
 
