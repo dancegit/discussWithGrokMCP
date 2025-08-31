@@ -49,9 +49,9 @@ Complete implementation with modular architecture:
 
 1. **Tools Module** (`lib/tools/`)
    - `ask.py` - Basic question-answer tool (backward compatible)
-   - `discuss.py` - Multi-turn conversation management with file context support
-   - `session.py` - Session persistence and management
-   - `context.py` - File-aware context handling for single questions
+   - `discuss.py` - Multi-turn conversation management with file context support (includes line ranges)
+   - `session.py` - Session persistence and management (includes line ranges)
+   - `context.py` - File-aware context handling for single questions (includes line ranges)
    - `health.py` - Server health monitoring
 
 2. **Grok Client** (`lib/grok_client.py`)
@@ -207,7 +207,7 @@ discussWithGrokMCP/
 The project has two working implementations:
 
 1. **Simple Server** (v0.3.x): Proven stable, used as fallback
-2. **Enhanced Server** (v0.8.x): Full feature set with all planned capabilities
+2. **Enhanced Server** (v0.9.x): Full feature set with all planned capabilities
 
 Both servers have been tested and work correctly with Claude Code CLI. The enhanced server includes:
 - 6 powerful tools for various interaction patterns
@@ -215,6 +215,30 @@ Both servers have been tested and work correctly with Claude Code CLI. The enhan
 - Comprehensive error handling and logging
 - Response caching for improved performance
 - Session persistence for context retention
+- Line range support for precise file context inclusion
+
+### File Context with Line Ranges
+
+The enhanced server supports specifying specific line ranges when including file context:
+
+```python
+# Include entire file
+context_files = ["file.py"]
+
+# Include specific lines
+context_files = [{"path": "file.py", "from": 10, "to": 50}]
+
+# Mix both formats
+context_files = [
+    "config.py",  # Entire file
+    {"path": "main.py", "from": 1, "to": 100}  # Lines 1-100
+]
+```
+
+This feature is available in:
+- `grok_discuss` - For focused code reviews
+- `grok_ask_with_context` - For targeted questions
+- `grok_continue_session` - For adding specific context to ongoing discussions
 
 ## Debugging
 
