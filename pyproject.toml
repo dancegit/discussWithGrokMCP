@@ -1,6 +1,6 @@
 [project]
 name = "grok-mcp-server"
-version = "0.1.0"
+version = "1.4.0"
 description = "MCP server for intelligent discussions with Grok-4 AI"
 requires-python = ">=3.11"
 dependencies = [
