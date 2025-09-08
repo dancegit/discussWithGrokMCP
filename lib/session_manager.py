@@ -5,6 +5,7 @@ Session Manager - State tracking with checkpointing and crash recovery.
 import asyncio
 import uuid
 import time
+import os
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from dataclasses import dataclass, field, asdict
@@ -59,6 +60,10 @@ class SessionManager:
         self.active_sessions: Dict[str, Session] = {}
         self.checkpoint_interval = 60  # seconds
         self._checkpoint_tasks: Dict[str, asyncio.Task] = {}
+        self.max_active_sessions = int(os.getenv('MAX_ACTIVE_SESSIONS', '100'))  # Max sessions in memory
+        self.session_access_times: Dict[str, datetime] = {}  # Track last access for LRU
+        self._cleanup_task = None  # Periodic cleanup task
+        self._start_cleanup_task()  # Start periodic cleanup
         
     def generate_session_id(self, prefix: str = "session") -> str:
         """Generate a unique session ID.
@@ -101,8 +106,12 @@ class SessionManager:
             }
         )
         
+        # Check if we need to evict before adding
+        await self._check_and_evict_sessions()
+        
         # Add to active sessions
         self.active_sessions[session_id] = session
+        self.session_access_times[session_id] = datetime.now()
         
         # Save initial state
         await self._save_session(session)
@@ -124,13 +133,19 @@ class SessionManager:
         """
         # Check active sessions first
         if session_id in self.active_sessions:
+            # Update access time for LRU
+            self.session_access_times[session_id] = datetime.now()
             return self.active_sessions[session_id]
         
         # Try to load from storage
         session_data = await self.storage.load_session(session_id)
         if session_data:
+            # Check if we need to evict before loading
+            await self._check_and_evict_sessions()
+            
             session = Session.from_dict(session_data)
             self.active_sessions[session_id] = session
+            self.session_access_times[session_id] = datetime.now()
             
             # Restart checkpoint task if session is active
             if session.status == "active":
@@ -409,7 +424,30 @@ class SessionManager:
             task.cancel()
             del self._checkpoint_tasks[session_id]
     
-    async def cleanup_inactive_sessions(self, timeout_hours: int = 24):
+    async def _check_and_evict_sessions(self):
+        """Check if eviction is needed and evict LRU sessions."""
+        if len(self.active_sessions) >= self.max_active_sessions:
+            # Find the least recently used session
+            if self.session_access_times:
+                lru_session_id = min(
+                    self.session_access_times.keys(),
+                    key=lambda k: self.session_access_times[k]
+                )
+                
+                # Save before evicting
+                if lru_session_id in self.active_sessions:
+                    await self._save_session(self.active_sessions[lru_session_id])
+                    
+                    # Stop checkpoint task
+                    self._stop_checkpoint_task(lru_session_id)
+                    
+                    # Remove from memory
+                    del self.active_sessions[lru_session_id]
+                    del self.session_access_times[lru_session_id]
+                    
+                    logger.info(f"Evicted LRU session {lru_session_id} to free memory")
+    
+    async def cleanup_inactive_sessions(self, timeout_hours: int = None):
         """Clean up inactive sessions.
         
         Args:
@@ -417,23 +455,27 @@ class SessionManager:
         """
         from datetime import timedelta
         
+        if timeout_hours is None:
+            timeout_hours = float(os.getenv('SESSION_INACTIVITY_TIMEOUT_HOURS', '2'))
+        
         cutoff_time = datetime.now() - timedelta(hours=timeout_hours)
         sessions_to_remove = []
         
         for session_id, session in self.active_sessions.items():
-            # Check last activity
-            if session.checkpoints:
-                last_activity = datetime.fromisoformat(session.last_checkpoint)
-            else:
-                last_activity = datetime.fromisoformat(session.created)
-            
-            if last_activity < cutoff_time and session.status != "active":
-                sessions_to_remove.append(session_id)
+            # Check last access time
+            if session_id in self.session_access_times:
+                last_access = self.session_access_times[session_id]
+                if last_access < cutoff_time and session.status != "active":
+                    sessions_to_remove.append(session_id)
         
         # Remove inactive sessions
         for session_id in sessions_to_remove:
+            # Save before removing
+            await self._save_session(self.active_sessions[session_id])
             self._stop_checkpoint_task(session_id)
             del self.active_sessions[session_id]
+            if session_id in self.session_access_times:
+                del self.session_access_times[session_id]
             logger.info(f"Cleaned up inactive session {session_id}")
     
     def get_active_sessions(self) -> List[Session]:
@@ -471,3 +513,33 @@ class SessionManager:
             "average_quality": round(avg_quality, 2),
             "has_baseline": session.has_baseline
         }
+    
+    def _start_cleanup_task(self):
+        """Start periodic cleanup task for memory management."""
+        async def periodic_cleanup():
+            """Run cleanup periodically."""
+            cleanup_interval_hours = float(os.getenv('MEMORY_CLEANUP_INTERVAL_HOURS', '1'))
+            cleanup_interval_seconds = cleanup_interval_hours * 3600
+            
+            while True:
+                try:
+                    await asyncio.sleep(cleanup_interval_seconds)
+                    
+                    # Run cleanup for inactive sessions
+                    await self.cleanup_inactive_sessions()
+                    
+                    # Log memory status
+                    logger.info(f"Memory cleanup completed. Active sessions: {len(self.active_sessions)}")
+                    
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.error(f"Error in periodic cleanup: {e}")
+        
+        # Create and store the task
+        self._cleanup_task = asyncio.create_task(periodic_cleanup())
+    
+    def stop_cleanup_task(self):
+        """Stop the periodic cleanup task."""
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()

@@ -119,6 +119,13 @@ class StorageManager:
             logger.warning(f"Session {session_id} not found")
             return None
         
+        # Check file size to prevent excessive loading
+        file_size = file_path.stat().st_size
+        max_size = int(os.getenv('MAX_SESSION_SIZE_MB', '50')) * 1024 * 1024  # Default 50 MB
+        if file_size > max_size:
+            logger.warning(f"Session {session_id} too large ({file_size} bytes, max {max_size} bytes), skipping load")
+            return None
+        
         try:
             async with aiofiles.open(file_path, 'r') as f:
                 content = await f.read()

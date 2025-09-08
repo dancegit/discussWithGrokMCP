@@ -54,6 +54,8 @@ session_manager = None
 tools = {}
 resources = {}
 cache = {}
+cache_size = 0  # Track total cache size in bytes
+max_cache_size = None  # Will be initialized from env
 streaming_enabled = False
 
 
@@ -62,6 +64,7 @@ class EnhancedMCPServer:
     
     def __init__(self):
         """Initialize the enhanced server."""
+        global max_cache_size
         self.initialized = False
         self.capabilities = self._build_capabilities()
         self.setup_tools()
@@ -69,6 +72,7 @@ class EnhancedMCPServer:
         self.request_count = 0
         self.error_count = 0
         self.start_time = datetime.now()
+        max_cache_size = int(os.getenv('MAX_CACHE_SIZE_MB', '100')) * 1024 * 1024
         logger.info(f"EnhancedMCPServer created at {self.start_time}")
     
     def _build_capabilities(self) -> Dict[str, Any]:
@@ -261,17 +265,22 @@ class EnhancedMCPServer:
             
             # Check cache for repeated questions (Phase 5)
             cache_key = f"{tool_name}:{json.dumps(arguments, sort_keys=True)}"
-            if cache_key in cache and os.getenv('MCP_ENABLE_CACHING', 'true').lower() == 'true':
-                cache_hit = cache[cache_key]
-                if (datetime.now() - cache_hit['timestamp']).seconds < int(os.getenv('MCP_CACHE_TTL', '3600')):
+            cache_enabled = os.getenv('MCP_ENABLE_CACHING', 'true').lower() == 'true'
+            cache_hit = False
+            
+            if cache_key in cache and cache_enabled:
+                cache_entry = cache[cache_key]
+                if (datetime.now() - cache_entry['timestamp']).seconds < int(os.getenv('MCP_CACHE_TTL', '3600')):
                     logger.debug(f"Cache hit for {cache_key}")
-                    result = cache_hit['result']
-            else:
-                # Store in cache
-                cache[cache_key] = {
-                    'result': result,
-                    'timestamp': datetime.now()
-                }
+                    result = cache_entry['result']
+                    cache_hit = True
+                else:
+                    # Remove expired entry
+                    self._remove_from_cache(cache_key)
+            
+            if not cache_hit and cache_enabled:
+                # Check if adding to cache would exceed size limit
+                self._add_to_cache(cache_key, result)
             
             # Check response size and truncate if necessary
             max_response_tokens = int(os.getenv('MCP_MAX_RESPONSE_TOKENS', '40000'))
@@ -442,6 +451,40 @@ class EnhancedMCPServer:
         
         # Fall back to simple truncation
         return truncated + "..."
+    
+    def _add_to_cache(self, key: str, value: str):
+        """Add an item to cache with size management."""
+        global cache, cache_size, max_cache_size
+        
+        # Calculate size of new entry
+        entry = {'result': value, 'timestamp': datetime.now()}
+        # Convert datetime to string for JSON serialization
+        entry_json = {'result': value, 'timestamp': entry['timestamp'].isoformat()}
+        entry_size = len(json.dumps(entry_json))
+        
+        # Check if we need to evict entries to make room
+        while cache and (cache_size + entry_size > max_cache_size):
+            # Find and remove oldest entry
+            oldest_key = min(cache.keys(), key=lambda k: cache[k]['timestamp'])
+            self._remove_from_cache(oldest_key)
+            logger.debug(f"Evicted cache entry {oldest_key} to free space")
+        
+        # Add new entry
+        cache[key] = entry
+        cache_size += entry_size
+        logger.debug(f"Added to cache: {key}, cache size now {cache_size / 1024:.1f} KB")
+    
+    def _remove_from_cache(self, key: str):
+        """Remove an item from cache and update size."""
+        global cache, cache_size
+        
+        if key in cache:
+            # Convert datetime to string for JSON serialization
+            entry = cache[key]
+            entry_json = {'result': entry['result'], 'timestamp': entry['timestamp'].isoformat() if hasattr(entry['timestamp'], 'isoformat') else str(entry['timestamp'])}
+            entry_size = len(json.dumps(entry_json))
+            del cache[key]
+            cache_size = max(0, cache_size - entry_size)  # Ensure non-negative
 
 
 async def main():

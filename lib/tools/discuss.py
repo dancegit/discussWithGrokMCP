@@ -2,6 +2,7 @@
 Discussion tool for multi-turn conversations with file context support and pagination.
 """
 
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from .base import BaseTool
@@ -276,35 +277,65 @@ class DiscussTool(BaseTool):
                     context_parts.append(f"\n--- File: {file_path} ---\n[File not found]\n--- End of {file_path} ---\n")
                     continue
                 
-                # Read file content
-                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                    lines = f.readlines()
+                # Check file size first
+                file_size = path.stat().st_size
+                max_file_size = int(os.getenv('MAX_FILE_SIZE_MB', '50')) * 1024 * 1024
+                if file_size > max_file_size:
+                    context_parts.append(f"\n--- File: {file_path} ---\n[File too large: {file_size} bytes, max {max_file_size} bytes]\n--- End of {file_path} ---\n")
+                    continue
                 
-                # Apply line range if specified
-                original_line_count = len(lines)
-                if from_line is not None or to_line is not None:
-                    # Convert to 0-based indexing
-                    start_idx = (from_line - 1) if from_line is not None else 0
-                    end_idx = to_line if to_line is not None else len(lines)
-                    
-                    # Validate ranges
-                    start_idx = max(0, min(start_idx, len(lines) - 1))
-                    end_idx = max(start_idx + 1, min(end_idx, len(lines)))
-                    
-                    lines = lines[start_idx:end_idx]
-                    range_info = f" (lines {start_idx + 1}-{end_idx})"
-                else:
-                    # Apply max_lines truncation only if no specific range is given
-                    if len(lines) > max_lines:
-                        lines = lines[:max_lines]
-                    range_info = ""
+                # Stream file content instead of loading all at once
+                content_lines = []
+                original_line_count = 0
+                
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    # Count total lines first if we need to apply ranges
+                    if from_line is not None or to_line is not None:
+                        # Count lines for range validation
+                        for _ in f:
+                            original_line_count += 1
+                        f.seek(0)  # Reset to beginning
+                        
+                        # Convert to 0-based indexing
+                        start_idx = (from_line - 1) if from_line is not None else 0
+                        end_idx = to_line if to_line is not None else original_line_count
+                        
+                        # Validate ranges
+                        start_idx = max(0, min(start_idx, original_line_count - 1))
+                        end_idx = max(start_idx + 1, min(end_idx, original_line_count))
+                        
+                        # Stream only the needed lines
+                        for line_num, line in enumerate(f):
+                            if line_num >= start_idx and line_num < end_idx:
+                                content_lines.append(line)
+                            elif line_num >= end_idx:
+                                break
+                        
+                        range_info = f" (lines {start_idx + 1}-{end_idx})"
+                    else:
+                        # Stream up to max_lines
+                        max_lines_env = int(os.getenv('MAX_CONTEXT_LINES_PER_FILE', str(max_lines)))
+                        effective_max_lines = min(max_lines, max_lines_env)
+                        
+                        for line_num, line in enumerate(f):
+                            if line_num >= effective_max_lines:
+                                break
+                            content_lines.append(line)
+                            original_line_count += 1
+                        
+                        # Count remaining lines if truncated
+                        if line_num >= effective_max_lines - 1:
+                            for _ in f:
+                                original_line_count += 1
+                        
+                        range_info = ""
                 
                 # Check if truncated by max_lines (only when no specific range)
                 truncated = (from_line is None and to_line is None and 
-                           original_line_count > max_lines)
+                           original_line_count > len(content_lines))
                 
                 # Format context
-                content = ''.join(lines)
+                content = ''.join(content_lines)
                 context_part = f"\n--- File: {file_path}{range_info} ---\n{content}\n--- End of {file_path} ---"
                 
                 if truncated:
