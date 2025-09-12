@@ -201,7 +201,7 @@ def function_c():
         
         assert "Review specific functions" in result
         assert "Session ID:" in result
-        assert "Context files:" in result
+        assert "Context:" in result
 
 
 class TestContextTool:

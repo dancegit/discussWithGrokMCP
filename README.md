@@ -100,81 +100,137 @@ grok_health
 | `grok_continue_session` | Resume conversations | Enhanced |
 | `grok_health` | Monitor server status | Enhanced |
 
-### File Context with Line Ranges
+### Enhanced File Context Support
 
-All context-aware tools (`grok_discuss`, `grok_ask_with_context`, `grok_continue_session`) support specifying specific line ranges from files:
+All context-aware tools (`grok_discuss`, `grok_ask_with_context`, `grok_continue_session`) now support advanced file context capabilities:
 
-- **String format**: `"path/to/file.py"` - includes the entire file
-- **Object format**: `{"path": "file.py", "from": 10, "to": 50}` - includes lines 10-50
-- **Mixed**: You can mix both formats in the same `context_files` array
+#### Input Types
 
-Line numbers are 1-based (matching standard editor line numbers). The `from` and `to` fields are optional - omit them to include the entire file.
+1. **Single Files**: `"path/to/file.py"` - includes the entire file
+2. **Directories**: `"src/"` - includes all files in the directory
+3. **Glob Patterns**: `"**/*.py"` - includes all Python files recursively
+4. **Line Ranges**: `{"path": "file.py", "from": 10, "to": 50}` - includes lines 10-50
+5. **Directory with Options**: 
+   ```json
+   {
+     "path": "src/",
+     "recursive": true,
+     "extensions": [".py", ".js"],
+     "exclude": ["test_*", "*.pyc"]
+   }
+   ```
+
+#### Features
+
+- **Recursive Directory Traversal**: Process files in subdirectories
+- **Extension Filtering**: Include only specific file types
+- **Pattern Exclusion**: Exclude files matching certain patterns
+- **Automatic Type Detection**: Context type (code/docs) automatically selects relevant extensions
+- **Smart Exclusions**: Automatically excludes common non-source files (__pycache__, .git, node_modules, etc.)
+- **Line Range Support**: Specify exact line ranges for any file
+- **Mixed Specifications**: Combine files, directories, and patterns in a single request
 
 ### Tool Examples
 
-#### `grok_discuss` with File Context and Line Ranges
+#### `grok_discuss` Examples
 ```python
-# Discuss code with full file context
+# Review entire directory
 grok_discuss(
-    topic="Review and optimize this implementation",
-    context_files=["app.py", "test_app.py"],
+    topic="Review this module's architecture",
+    context_files=["src/auth/"],
     context_type="code",
     max_turns=3,
     expert_mode=True
 )
 
-# Discuss specific functions using line ranges
+# Review specific file types recursively
 grok_discuss(
-    topic="Review the authentication logic",
+    topic="Analyze all Python tests",
     context_files=[
-        {"path": "auth.py", "from": 45, "to": 120},  # Auth class
-        {"path": "middleware.py", "from": 10, "to": 35}  # Auth middleware
-    ],
-    context_type="code",
-    max_turns=2
-)
-
-# Mix full files and specific sections
-grok_discuss(
-    topic="Explain this API design",
-    context_files=[
-        "api_spec.md",  # Full file
-        {"path": "openapi.yaml", "from": 50, "to": 150}  # Specific endpoints
-    ],
-    context_type="docs",
-    max_turns=2
-)
-```
-
-#### `grok_ask_with_context`
-```python
-# Ask about specific code sections
-grok_ask_with_context(
-    question="What design patterns are used here?",
-    context_files=[
-        {"path": "src/main.py", "from": 100, "to": 200}
+        {
+            "path": "tests/",
+            "recursive": true,
+            "extensions": [".py"],
+            "exclude": ["__pycache__"]
+        }
     ],
     context_type="code"
 )
 
-# Mix full files and line ranges
-grok_ask_with_context(
-    question="How do these components interact?",
+# Use glob patterns
+grok_discuss(
+    topic="Review all API endpoints",
     context_files=[
-        "src/config.py",  # Full config file
-        {"path": "src/main.py", "from": 1, "to": 50}  # Just imports and setup
+        "**/api/*.py",
+        "**/routes/*.js"
+    ],
+    context_type="code"
+)
+
+# Mix different input types
+grok_discuss(
+    topic="Full system review",
+    context_files=[
+        "README.md",  # Single file
+        {"path": "config.py", "from": 1, "to": 50},  # File with line range
+        "src/core/",  # Directory
+        "**/*.yaml"  # Pattern
+    ],
+    max_turns=5
+)
+```
+
+#### `grok_ask_with_context` Examples
+```python
+# Ask about an entire module
+grok_ask_with_context(
+    question="What is the purpose of this module?",
+    context_files=["src/auth/"],
+    context_type="code"
+)
+
+# Ask about specific file types
+grok_ask_with_context(
+    question="Are there any security issues in the SQL queries?",
+    context_files=[
+        {
+            "path": ".",
+            "recursive": true,
+            "extensions": [".sql", ".py"],
+            "pattern": "**/queries/**"
+        }
+    ],
+    context_type="code"
+)
+
+# Ask with mixed context
+grok_ask_with_context(
+    question="How does the configuration affect the API behavior?",
+    context_files=[
+        "config/",  # All config files
+        "**/*api*.py",  # All API-related Python files
+        {"path": "docs/api.md", "from": 50, "to": 150}  # Specific docs section
     ]
 )
 ```
 
-#### `grok_continue_session` with File Context
+#### `grok_continue_session` Examples
 ```python
-# Continue a session with new file context
+# Continue with directory context
 grok_continue_session(
     session_id="abc-123",
-    message="Now let's look at the error handling",
+    message="Now let's review the test coverage",
+    context_files=["tests/"]
+)
+
+# Continue with filtered files
+grok_continue_session(
+    session_id="abc-123",
+    message="Let's examine all error handling",
     context_files=[
-        {"path": "errors.py", "from": 20, "to": 80}
+        "**/error*.py",
+        "**/exception*.py",
+        {"path": "src/", "recursive": true, "pattern": "*handler*.py"}
     ]
 )
 ```
