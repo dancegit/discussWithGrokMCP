@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from .base import BaseTool
 from .session import SessionManager
+from .context_loader import ContextLoader
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,19 +45,31 @@ class DiscussTool(BaseTool):
                     "type": "array",
                     "items": {
                         "oneOf": [
-                            {"type": "string"},
+                            {"type": "string", "description": "File path, directory path, or glob pattern"},
                             {
                                 "type": "object",
                                 "properties": {
-                                    "path": {"type": "string", "description": "File path"},
-                                    "from": {"type": "integer", "description": "Start line number (1-based)", "minimum": 1},
-                                    "to": {"type": "integer", "description": "End line number (1-based)", "minimum": 1}
+                                    "path": {"type": "string", "description": "File path, directory path, or glob pattern"},
+                                    "from": {"type": "integer", "description": "Start line number (1-based) for files", "minimum": 1},
+                                    "to": {"type": "integer", "description": "End line number (1-based) for files", "minimum": 1},
+                                    "recursive": {"type": "boolean", "description": "Recursive directory traversal", "default": true},
+                                    "extensions": {
+                                        "type": "array", 
+                                        "items": {"type": "string"},
+                                        "description": "File extensions to include (e.g., ['.py', '.js'])"
+                                    },
+                                    "exclude": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Patterns to exclude (e.g., ['test_*', '*.pyc'])"
+                                    },
+                                    "pattern": {"type": "string", "description": "Glob pattern for file matching"}
                                 },
                                 "required": ["path"]
                             }
                         ]
                     },
-                    "description": "List of file paths or objects with path and line ranges {path, from?, to?}"
+                    "description": "List of files, directories, or patterns. Supports: file paths, directories (with recursive/extension options), glob patterns ('**/*.py'), and line ranges"
                 },
                 "context_type": {
                     "type": "string",
@@ -68,6 +81,11 @@ class DiscussTool(BaseTool):
                     "type": "integer",
                     "description": "Maximum lines per file",
                     "default": 100
+                },
+                "max_total_context_lines": {
+                    "type": "integer",
+                    "description": "Maximum total lines across all files",
+                    "default": 10000
                 },
                 "max_turns": {
                     "type": "integer",
@@ -111,6 +129,7 @@ class DiscussTool(BaseTool):
                      context_files: List[str] = None,
                      context_type: str = "general",
                      max_context_lines: int = 100,
+                     max_total_context_lines: int = 10000,
                      max_turns: int = 3, expert_mode: bool = False,
                      page: int = 1, turns_per_page: int = 2, 
                      paginate: bool = True, **kwargs) -> str:
@@ -123,8 +142,14 @@ class DiscussTool(BaseTool):
                 
                 # Build file context if provided
                 file_context = ""
+                file_metadata = {}
                 if context_files:
-                    file_context = self._load_context_files(context_files, max_context_lines)
+                    file_context, file_metadata = ContextLoader.load_context(
+                        context_files,
+                        max_lines_per_file=max_context_lines,
+                        max_total_lines=max_total_context_lines,
+                        context_type=context_type
+                    )
                 
                 # Build initial prompt
                 initial_prompt = f"Let's discuss: {topic}"
@@ -181,9 +206,20 @@ class DiscussTool(BaseTool):
                             from_line = file_spec.get('from', '?')
                             to_line = file_spec.get('to', '?')
                             file_list.append(f"{path}:{from_line}-{to_line}")
+                        elif 'pattern' in file_spec:
+                            file_list.append(f"Pattern: {file_spec['pattern']}")
+                        elif 'recursive' in file_spec or 'extensions' in file_spec:
+                            desc = path
+                            if file_spec.get('recursive'):
+                                desc += " (recursive)"
+                            if 'extensions' in file_spec:
+                                desc += f" [{', '.join(file_spec['extensions'])}]"
+                            file_list.append(desc)
                         else:
                             file_list.append(path)
-                result += f"Context files: {', '.join(file_list)}\n"
+                result += f"Context: {', '.join(file_list)}\n"
+                if file_metadata and 'files_processed' in file_metadata:
+                    result += f"Files loaded: {file_metadata['files_processed']}, Total lines: {file_metadata.get('total_lines', 0)}\n"
             
             if paginate:
                 result += f"Page {page} of {total_pages} (Turns {start_turn + 1}-{end_turn} of {max_turns})\n"
@@ -251,105 +287,6 @@ class DiscussTool(BaseTool):
             logger.error(f"Error in discussion: {e}")
             return f"Error: {str(e)}"
     
-    def _load_context_files(self, file_specs, max_lines: int) -> str:
-        """Load content from context files with optional line ranges."""
-        context_parts = []
-        
-        for file_spec in file_specs:
-            try:
-                # Parse file specification
-                if isinstance(file_spec, str):
-                    # Simple string path
-                    file_path = file_spec
-                    from_line = None
-                    to_line = None
-                elif isinstance(file_spec, dict):
-                    # Object with path and optional line ranges
-                    file_path = file_spec['path']
-                    from_line = file_spec.get('from')
-                    to_line = file_spec.get('to')
-                else:
-                    logger.warning(f"Invalid file specification: {file_spec}")
-                    continue
-                
-                path = Path(file_path)
-                if not path.exists():
-                    context_parts.append(f"\n--- File: {file_path} ---\n[File not found]\n--- End of {file_path} ---\n")
-                    continue
-                
-                # Check file size first
-                file_size = path.stat().st_size
-                max_file_size = int(os.getenv('MAX_FILE_SIZE_MB', '50')) * 1024 * 1024
-                if file_size > max_file_size:
-                    context_parts.append(f"\n--- File: {file_path} ---\n[File too large: {file_size} bytes, max {max_file_size} bytes]\n--- End of {file_path} ---\n")
-                    continue
-                
-                # Stream file content instead of loading all at once
-                content_lines = []
-                original_line_count = 0
-                
-                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                    # Count total lines first if we need to apply ranges
-                    if from_line is not None or to_line is not None:
-                        # Count lines for range validation
-                        for _ in f:
-                            original_line_count += 1
-                        f.seek(0)  # Reset to beginning
-                        
-                        # Convert to 0-based indexing
-                        start_idx = (from_line - 1) if from_line is not None else 0
-                        end_idx = to_line if to_line is not None else original_line_count
-                        
-                        # Validate ranges
-                        start_idx = max(0, min(start_idx, original_line_count - 1))
-                        end_idx = max(start_idx + 1, min(end_idx, original_line_count))
-                        
-                        # Stream only the needed lines
-                        for line_num, line in enumerate(f):
-                            if line_num >= start_idx and line_num < end_idx:
-                                content_lines.append(line)
-                            elif line_num >= end_idx:
-                                break
-                        
-                        range_info = f" (lines {start_idx + 1}-{end_idx})"
-                    else:
-                        # Stream up to max_lines
-                        max_lines_env = int(os.getenv('MAX_CONTEXT_LINES_PER_FILE', str(max_lines)))
-                        effective_max_lines = min(max_lines, max_lines_env)
-                        
-                        for line_num, line in enumerate(f):
-                            if line_num >= effective_max_lines:
-                                break
-                            content_lines.append(line)
-                            original_line_count += 1
-                        
-                        # Count remaining lines if truncated
-                        if line_num >= effective_max_lines - 1:
-                            for _ in f:
-                                original_line_count += 1
-                        
-                        range_info = ""
-                
-                # Check if truncated by max_lines (only when no specific range)
-                truncated = (from_line is None and to_line is None and 
-                           original_line_count > len(content_lines))
-                
-                # Format context
-                content = ''.join(content_lines)
-                context_part = f"\n--- File: {file_path}{range_info} ---\n{content}\n--- End of {file_path} ---"
-                
-                if truncated:
-                    context_part += f"\n[Truncated to {max_lines} lines of {original_line_count} total]"
-                elif from_line is not None or to_line is not None:
-                    context_part += f"\n[Showing {len(lines)} lines of {original_line_count} total]"
-                
-                context_parts.append(context_part)
-                
-            except Exception as e:
-                logger.warning(f"Error reading {file_spec}: {e}")
-                context_parts.append(f"\n--- File: {file_spec} ---\n[Error reading file: {str(e)}]\n--- End of file ---\n")
-        
-        return ''.join(context_parts) if context_parts else ""
     
     def _build_contextual_prompt(self, base_prompt: str, file_context: str, context_type: str) -> str:
         """Build a prompt with file context."""

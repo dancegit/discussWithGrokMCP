@@ -159,10 +159,12 @@ discussWithGrokMCP/
 │       ├── discuss.py         # Discussions
 │       ├── session.py         # Session management
 │       ├── context.py         # Context handling
+│       ├── context_loader.py  # Advanced file/directory loading
 │       └── health.py          # Health checks
 ├── tests/                     # Test suite
 │   ├── test_tools.py
-│   └── test_integration.py
+│   ├── test_integration.py
+│   └── test_context_loader.py # Context loader tests
 ├── sessions/                  # Session storage (auto-created)
 ├── .env                       # API keys (create this)
 ├── .gitignore                # Excludes sensitive files
@@ -217,28 +219,75 @@ Both servers have been tested and work correctly with Claude Code CLI. The enhan
 - Session persistence for context retention
 - Line range support for precise file context inclusion
 
-### File Context with Line Ranges
+### Enhanced File Context Support
 
-The enhanced server supports specifying specific line ranges when including file context:
+The enhanced server now supports advanced file context capabilities including directories, glob patterns, and intelligent filtering:
+
+#### Supported Input Types
 
 ```python
-# Include entire file
+# 1. Single files
 context_files = ["file.py"]
 
-# Include specific lines
+# 2. Directories (non-recursive by default when using string)
+context_files = ["src/"]
+
+# 3. Glob patterns
+context_files = ["**/*.py", "src/**/*.test.js"]
+
+# 4. Files with line ranges
 context_files = [{"path": "file.py", "from": 10, "to": 50}]
 
-# Mix both formats
+# 5. Directories with options
+context_files = [{
+    "path": "src/",
+    "recursive": true,  # Traverse subdirectories
+    "extensions": [".py", ".js"],  # Only these file types
+    "exclude": ["test_*", "*.pyc"],  # Exclude patterns
+    "pattern": "**/api/*.py"  # Additional glob filter
+}]
+
+# 6. Mixed specifications
 context_files = [
-    "config.py",  # Entire file
-    {"path": "main.py", "from": 1, "to": 100}  # Lines 1-100
+    "README.md",  # Single file
+    "src/",  # Directory
+    "**/*.yaml",  # Pattern
+    {"path": "main.py", "from": 1, "to": 100},  # File with range
+    {"path": "tests/", "recursive": true, "extensions": [".py"]}  # Filtered directory
 ]
 ```
 
+#### Context Type Auto-Detection
+
+When a directory is specified without extensions, the context type determines default extensions:
+
+- **code**: `.py`, `.js`, `.ts`, `.java`, `.cpp`, `.go`, `.rs`, etc.
+- **docs**: `.md`, `.txt`, `.rst`, `.adoc`, etc.
+- **config**: `.json`, `.yaml`, `.yml`, `.toml`, `.ini`, etc.
+- **general**: All files (no filtering)
+
+#### Automatic Exclusions
+
+The following are automatically excluded to avoid noise:
+- `__pycache__`, `.git`, `.svn`, `node_modules`
+- `.venv`, `venv`, `env`, `.env`
+- `*.pyc`, `*.pyo`, `*.pyd`, `.DS_Store`
+- `.pytest_cache`, `.mypy_cache`, `dist`, `build`
+
+#### Implementation Details
+
+The new `ContextLoader` class (in `lib/tools/context_loader.py`) handles all file resolution:
+
+- Efficiently processes large directories
+- Respects line and total line limits
+- Provides detailed metadata about loaded files
+- Handles errors gracefully
+- Supports various text encodings
+
 This feature is available in:
-- `grok_discuss` - For focused code reviews
+- `grok_discuss` - For comprehensive code reviews
 - `grok_ask_with_context` - For targeted questions
-- `grok_continue_session` - For adding specific context to ongoing discussions
+- `grok_continue_session` - For adding context to ongoing discussions
 
 ## Debugging
 

@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from .base import BaseTool
+from .context_loader import ContextLoader
 import logging
 
 logger = logging.getLogger(__name__)
@@ -183,24 +184,41 @@ class ContinueSessionTool(BaseTool):
                     "type": "array",
                     "items": {
                         "oneOf": [
-                            {"type": "string"},
+                            {"type": "string", "description": "File path, directory path, or glob pattern"},
                             {
                                 "type": "object",
                                 "properties": {
-                                    "path": {"type": "string", "description": "File path"},
-                                    "from": {"type": "integer", "description": "Start line number (1-based)", "minimum": 1},
-                                    "to": {"type": "integer", "description": "End line number (1-based)", "minimum": 1}
+                                    "path": {"type": "string", "description": "File path, directory path, or glob pattern"},
+                                    "from": {"type": "integer", "description": "Start line number (1-based) for files", "minimum": 1},
+                                    "to": {"type": "integer", "description": "End line number (1-based) for files", "minimum": 1},
+                                    "recursive": {"type": "boolean", "description": "Recursive directory traversal", "default": true},
+                                    "extensions": {
+                                        "type": "array", 
+                                        "items": {"type": "string"},
+                                        "description": "File extensions to include (e.g., ['.py', '.js'])"
+                                    },
+                                    "exclude": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Patterns to exclude (e.g., ['test_*', '*.pyc'])"
+                                    },
+                                    "pattern": {"type": "string", "description": "Glob pattern for file matching"}
                                 },
                                 "required": ["path"]
                             }
                         ]
                     },
-                    "description": "Optional list of file paths or objects with path and line ranges {path, from?, to?}"
+                    "description": "Optional files, directories, or patterns. Supports: file paths, directories (with recursive/extension options), glob patterns ('**/*.py'), and line ranges"
                 },
                 "max_context_lines": {
                     "type": "integer",
                     "description": "Maximum lines per file to include",
                     "default": 500
+                },
+                "max_total_context_lines": {
+                    "type": "integer",
+                    "description": "Maximum total lines across all files",
+                    "default": 10000
                 }
             },
             "required": ["session_id", "message"]
@@ -208,7 +226,8 @@ class ContinueSessionTool(BaseTool):
     
     async def execute(self, session_id: str, message: str, 
                      context_files: List[str] = None, 
-                     max_context_lines: int = 500, **kwargs) -> str:
+                     max_context_lines: int = 500,
+                     max_total_context_lines: int = 10000, **kwargs) -> str:
         """Continue a session with optional file context."""
         try:
             session = self.session_manager.get_session(session_id)
@@ -218,9 +237,16 @@ class ContinueSessionTool(BaseTool):
             # Build message with context if provided
             full_message = message
             if context_files:
-                context_content = self._load_context_files(context_files, max_context_lines)
+                context_content, metadata = ContextLoader.load_context(
+                    context_files,
+                    max_lines_per_file=max_context_lines,
+                    max_total_lines=max_total_context_lines,
+                    context_type='general'
+                )
                 if context_content:
                     full_message = f"{message}\n\nContext from files:\n{context_content}"
+                    if metadata and metadata.get('files_processed', 0) > 0:
+                        full_message += f"\n\n[Loaded {metadata['files_processed']} files, {metadata.get('total_lines', 0)} lines]"
             
             # Add user message
             self.session_manager.add_message(session_id, "user", full_message)
@@ -244,72 +270,3 @@ class ContinueSessionTool(BaseTool):
             logger.error(f"Error continuing session: {e}")
             return f"Error: {str(e)}"
     
-    def _load_context_files(self, file_specs, max_lines: int) -> str:
-        """Load content from context files with optional line ranges."""
-        context_parts = []
-        
-        for file_spec in file_specs:
-            try:
-                # Parse file specification
-                if isinstance(file_spec, str):
-                    # Simple string path
-                    file_path = file_spec
-                    from_line = None
-                    to_line = None
-                elif isinstance(file_spec, dict):
-                    # Object with path and optional line ranges
-                    file_path = file_spec['path']
-                    from_line = file_spec.get('from')
-                    to_line = file_spec.get('to')
-                else:
-                    logger.warning(f"Invalid file specification: {file_spec}")
-                    continue
-                
-                path = Path(file_path)
-                if not path.exists():
-                    logger.warning(f"Context file not found: {file_path}")
-                    continue
-                
-                # Read file content
-                with open(path, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                
-                # Apply line range if specified
-                original_line_count = len(lines)
-                if from_line is not None or to_line is not None:
-                    # Convert to 0-based indexing
-                    start_idx = (from_line - 1) if from_line is not None else 0
-                    end_idx = to_line if to_line is not None else len(lines)
-                    
-                    # Validate ranges
-                    start_idx = max(0, min(start_idx, len(lines) - 1))
-                    end_idx = max(start_idx + 1, min(end_idx, len(lines)))
-                    
-                    lines = lines[start_idx:end_idx]
-                    range_info = f" (lines {start_idx + 1}-{end_idx})"
-                else:
-                    # Apply max_lines truncation only if no specific range is given
-                    if len(lines) > max_lines:
-                        lines = lines[:max_lines]
-                    range_info = ""
-                
-                # Check if truncated by max_lines (only when no specific range)
-                truncated = (from_line is None and to_line is None and 
-                           original_line_count > max_lines)
-                
-                # Format context
-                content = ''.join(lines)
-                context_part = f"\n--- File: {file_path}{range_info} ---\n{content}"
-                
-                if truncated:
-                    context_part += f"\n[Truncated to {max_lines} lines of {original_line_count} total]"
-                elif from_line is not None or to_line is not None:
-                    context_part += f"\n[Showing {len(lines)} lines of {original_line_count} total]"
-                
-                context_parts.append(context_part)
-                
-            except Exception as e:
-                logger.error(f"Error reading context file {file_spec}: {e}")
-                context_parts.append(f"\n--- File: {file_spec} ---\nError reading file: {str(e)}")
-        
-        return '\n'.join(context_parts) if context_parts else ""

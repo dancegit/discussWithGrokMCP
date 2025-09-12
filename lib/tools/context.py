@@ -5,6 +5,7 @@ Context-aware question tool.
 from pathlib import Path
 from typing import Any, Dict, List
 from .base import BaseTool
+from .context_loader import ContextLoader
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,19 +35,31 @@ class AskWithContextTool(BaseTool):
                     "type": "array",
                     "items": {
                         "oneOf": [
-                            {"type": "string"},
+                            {"type": "string", "description": "File path, directory path, or glob pattern"},
                             {
                                 "type": "object",
                                 "properties": {
-                                    "path": {"type": "string", "description": "File path"},
-                                    "from": {"type": "integer", "description": "Start line number (1-based)", "minimum": 1},
-                                    "to": {"type": "integer", "description": "End line number (1-based)", "minimum": 1}
+                                    "path": {"type": "string", "description": "File path, directory path, or glob pattern"},
+                                    "from": {"type": "integer", "description": "Start line number (1-based) for files", "minimum": 1},
+                                    "to": {"type": "integer", "description": "End line number (1-based) for files", "minimum": 1},
+                                    "recursive": {"type": "boolean", "description": "Recursive directory traversal", "default": true},
+                                    "extensions": {
+                                        "type": "array", 
+                                        "items": {"type": "string"},
+                                        "description": "File extensions to include (e.g., ['.py', '.js'])"
+                                    },
+                                    "exclude": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Patterns to exclude (e.g., ['test_*', '*.pyc'])"
+                                    },
+                                    "pattern": {"type": "string", "description": "Glob pattern for file matching"}
                                 },
                                 "required": ["path"]
                             }
                         ]
                     },
-                    "description": "List of file paths or objects with path and line ranges {path, from?, to?}"
+                    "description": "List of files, directories, or patterns. Supports: file paths, directories (with recursive/extension options), glob patterns ('**/*.py'), and line ranges"
                 },
                 "context_type": {
                     "type": "string",
@@ -58,19 +71,31 @@ class AskWithContextTool(BaseTool):
                     "type": "integer",
                     "description": "Maximum lines per file",
                     "default": 100
+                },
+                "max_total_context_lines": {
+                    "type": "integer",
+                    "description": "Maximum total lines across all files",
+                    "default": 10000
                 }
             },
             "required": ["question"]
         }
     
     async def execute(self, question: str, context_files: List[str] = None,
-                     context_type: str = "general", max_context_lines: int = 100, **kwargs) -> str:
+                     context_type: str = "general", max_context_lines: int = 100,
+                     max_total_context_lines: int = 10000, **kwargs) -> str:
         """Execute with context."""
         try:
             # Build context from files
             context = ""
+            metadata = {}
             if context_files:
-                context = self._load_context_files(context_files, max_context_lines)
+                context, metadata = ContextLoader.load_context(
+                    context_files,
+                    max_lines_per_file=max_context_lines,
+                    max_total_lines=max_total_context_lines,
+                    context_type=context_type
+                )
             
             # Build the prompt
             prompt = self._build_contextual_prompt(question, context, context_type)
@@ -78,81 +103,19 @@ class AskWithContextTool(BaseTool):
             # Get response
             response = await self.grok_client.ask(prompt=prompt, stream=False)
             
-            return response.content
+            # Add metadata info if relevant
+            result = response.content
+            if metadata and metadata.get('files_processed', 0) > 0:
+                result += f"\n\n[Context: {metadata['files_processed']} files, {metadata.get('total_lines', 0)} lines]"
+                if metadata.get('errors'):
+                    result += f"\n[Errors: {'; '.join(metadata['errors'])}]"
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error in context-aware ask: {e}")
             return f"Error: {str(e)}"
     
-    def _load_context_files(self, file_specs, max_lines: int) -> str:
-        """Load content from context files with optional line ranges."""
-        context_parts = []
-        
-        for file_spec in file_specs:
-            try:
-                # Parse file specification
-                if isinstance(file_spec, str):
-                    # Simple string path
-                    file_path = file_spec
-                    from_line = None
-                    to_line = None
-                elif isinstance(file_spec, dict):
-                    # Object with path and optional line ranges
-                    file_path = file_spec['path']
-                    from_line = file_spec.get('from')
-                    to_line = file_spec.get('to')
-                else:
-                    logger.warning(f"Invalid file specification: {file_spec}")
-                    continue
-                
-                path = Path(file_path)
-                if not path.exists():
-                    context_parts.append(f"\n--- File: {file_path} ---\n[File not found]\n--- End of {file_path} ---\n")
-                    continue
-                
-                # Read file content
-                with open(path, 'r', encoding='utf-8') as f:
-                    lines = f.readlines()
-                
-                # Apply line range if specified
-                original_line_count = len(lines)
-                if from_line is not None or to_line is not None:
-                    # Convert to 0-based indexing
-                    start_idx = (from_line - 1) if from_line is not None else 0
-                    end_idx = to_line if to_line is not None else len(lines)
-                    
-                    # Validate ranges
-                    start_idx = max(0, min(start_idx, len(lines) - 1))
-                    end_idx = max(start_idx + 1, min(end_idx, len(lines)))
-                    
-                    lines = lines[start_idx:end_idx]
-                    range_info = f" (lines {start_idx + 1}-{end_idx})"
-                else:
-                    # Apply max_lines truncation only if no specific range is given
-                    if len(lines) > max_lines:
-                        lines = lines[:max_lines]
-                    range_info = ""
-                
-                # Check if truncated by max_lines (only when no specific range)
-                truncated = (from_line is None and to_line is None and 
-                           original_line_count > max_lines)
-                
-                # Format context
-                content = ''.join(lines)
-                context_part = f"\n--- File: {file_path}{range_info} ---\n{content}\n--- End of {file_path} ---"
-                
-                if truncated:
-                    context_part += f"\n[Truncated to {max_lines} lines of {original_line_count} total]"
-                elif from_line is not None or to_line is not None:
-                    context_part += f"\n[Showing {len(lines)} lines of {original_line_count} total]"
-                
-                context_parts.append(context_part)
-                
-            except Exception as e:
-                logger.error(f"Error reading {file_spec}: {e}")
-                context_parts.append(f"\n--- File: {file_spec} ---\n[Error reading file: {str(e)}]\n--- End of file ---\n")
-        
-        return ''.join(context_parts) if context_parts else ""
     
     def _build_contextual_prompt(self, question: str, context: str, context_type: str) -> str:
         """Build a prompt with context."""
