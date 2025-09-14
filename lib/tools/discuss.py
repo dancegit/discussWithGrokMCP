@@ -52,7 +52,7 @@ class DiscussTool(BaseTool):
                                     "path": {"type": "string", "description": "File path, directory path, or glob pattern"},
                                     "from": {"type": "integer", "description": "Start line number (1-based) for files", "minimum": 1},
                                     "to": {"type": "integer", "description": "End line number (1-based) for files", "minimum": 1},
-                                    "recursive": {"type": "boolean", "description": "Recursive directory traversal", "default": true},
+                                    "recursive": {"type": "boolean", "description": "Recursive directory traversal", "default": True},
                                     "extensions": {
                                         "type": "array", 
                                         "items": {"type": "string"},
