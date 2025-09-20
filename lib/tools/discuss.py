@@ -122,10 +122,10 @@ class DiscussTool(BaseTool):
                     "description": "Session ID to continue an existing discussion"
                 }
             },
-            "required": ["topic"]
+            "required": []
         }
     
-    async def execute(self, topic: str, context: str = None, 
+    async def execute(self, topic: str = None, context: str = None, 
                      context_files: List[str] = None,
                      context_type: str = "general",
                      max_context_lines: int = 100,
@@ -138,6 +138,9 @@ class DiscussTool(BaseTool):
             # Create a new session or continue existing one
             session_id = kwargs.get('session_id')
             if not session_id:
+                # Creating new session requires topic
+                if not topic:
+                    return "Error: 'topic' parameter is required when creating a new discussion"
                 session_id = self.session_manager.create_session(topic)
                 
                 # Build file context if provided
