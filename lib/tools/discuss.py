@@ -85,7 +85,7 @@ class DiscussTool(BaseTool):
                 "max_total_context_lines": {
                     "type": "integer",
                     "description": "Maximum total lines across all files",
-                    "default": 10000
+                    "default": 2000000
                 },
                 "max_turns": {
                     "type": "integer",
@@ -129,7 +129,7 @@ class DiscussTool(BaseTool):
                      context_files: List[str] = None,
                      context_type: str = "general",
                      max_context_lines: int = 100,
-                     max_total_context_lines: int = 10000,
+                     max_total_context_lines: int = 2000000,
                      max_turns: int = 3, expert_mode: bool = False,
                      page: int = 1, turns_per_page: int = 2, 
                      paginate: bool = True, **kwargs) -> str:

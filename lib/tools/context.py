@@ -75,7 +75,7 @@ class AskWithContextTool(BaseTool):
                 "max_total_context_lines": {
                     "type": "integer",
                     "description": "Maximum total lines across all files",
-                    "default": 10000
+                    "default": 2000000
                 }
             },
             "required": ["question"]
@@ -83,7 +83,7 @@ class AskWithContextTool(BaseTool):
     
     async def execute(self, question: str, context_files: List[str] = None,
                      context_type: str = "general", max_context_lines: int = 100,
-                     max_total_context_lines: int = 10000, **kwargs) -> str:
+                     max_total_context_lines: int = 2000000, **kwargs) -> str:
         """Execute with context."""
         try:
             # Build context from files
