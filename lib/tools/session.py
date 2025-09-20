@@ -218,7 +218,7 @@ class ContinueSessionTool(BaseTool):
                 "max_total_context_lines": {
                     "type": "integer",
                     "description": "Maximum total lines across all files",
-                    "default": 10000
+                    "default": 2000000
                 }
             },
             "required": ["session_id", "message"]
@@ -227,7 +227,7 @@ class ContinueSessionTool(BaseTool):
     async def execute(self, session_id: str, message: str, 
                      context_files: List[str] = None, 
                      max_context_lines: int = 500,
-                     max_total_context_lines: int = 10000, **kwargs) -> str:
+                     max_total_context_lines: int = 2000000, **kwargs) -> str:
         """Continue a session with optional file context."""
         try:
             session = self.session_manager.get_session(session_id)
