@@ -34,8 +34,8 @@ class SessionManager:
             except Exception as e:
                 logger.error(f"Failed to load session {session_file}: {e}")
     
-    def create_session(self, topic: str) -> str:
-        """Create a new session."""
+    def create_session(self, topic: str, pagination_settings: Dict = None) -> str:
+        """Create a new session with optional pagination settings."""
         session_id = str(uuid.uuid4())
         session = {
             "id": session_id,
@@ -43,7 +43,8 @@ class SessionManager:
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
             "messages": [],
-            "status": "active"
+            "status": "active",
+            "pagination": pagination_settings or {}
         }
         self.sessions[session_id] = session
         self._save_session(session_id)

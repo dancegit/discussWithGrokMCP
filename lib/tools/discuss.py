@@ -141,7 +141,14 @@ class DiscussTool(BaseTool):
                 # Creating new session requires topic
                 if not topic:
                     return "Error: 'topic' parameter is required when creating a new discussion"
-                session_id = self.session_manager.create_session(topic)
+
+                # Store pagination settings with the session
+                pagination_settings = {
+                    "turns_per_page": turns_per_page,
+                    "max_turns": max_turns,
+                    "paginate": paginate
+                }
+                session_id = self.session_manager.create_session(topic, pagination_settings)
                 
                 # Build file context if provided
                 file_context = ""
@@ -177,6 +184,18 @@ class DiscussTool(BaseTool):
                 if not session:
                     return f"Error: Session {session_id} not found"
                 messages = session['messages']
+
+                # Retrieve pagination settings from session if they exist
+                if 'pagination' in session and session['pagination']:
+                    stored_pagination = session['pagination']
+                    # Use stored values if not explicitly provided
+                    if 'turns_per_page' not in kwargs:
+                        turns_per_page = stored_pagination.get('turns_per_page', turns_per_page)
+                    if 'max_turns' not in kwargs:
+                        max_turns = stored_pagination.get('max_turns', max_turns)
+                    if 'paginate' not in kwargs:
+                        paginate = stored_pagination.get('paginate', paginate)
+
                 # Extract context_files from kwargs if continuing a session
                 context_files = kwargs.get('context_files')
             
