@@ -120,21 +120,62 @@ class DiscussTool(BaseTool):
                 "session_id": {
                     "type": "string",
                     "description": "Session ID to continue an existing discussion"
+                },
+                "model": {
+                    "type": "string",
+                    "description": "Model to use for the discussion",
+                    "enum": ["grok-code-fast", "grok-4-fast-reasoning", "grok-4-0709", "grok-2-1212", "grok-2-vision", "grok-beta"],
+                    "default": "grok-code-fast"
                 }
             },
             "required": []
         }
     
-    async def execute(self, topic: str = None, context: str = None, 
+    async def execute(self, topic: str = None, context: str = None,
                      context_files: List[str] = None,
                      context_type: str = "general",
                      max_context_lines: int = 100,
                      max_total_context_lines: int = 2000000,
                      max_turns: int = 3, expert_mode: bool = False,
-                     page: int = 1, turns_per_page: int = 2, 
-                     paginate: bool = True, **kwargs) -> str:
+                     page: int = 1, turns_per_page: int = 2,
+                     paginate: bool = True, model: str = None, **kwargs) -> str:
         """Start a discussion with optional file context and pagination support."""
         try:
+            # Handle model selection and adjust context limits
+            if not model:
+                model = "grok-code-fast"  # Default model
+
+            # Adjust max_total_context_lines based on model capabilities
+            model_limits = {
+                "grok-code-fast": 200000,  # ~256K tokens, conservative estimate
+                "grok-4-fast-reasoning": 2000000,  # 2M tokens
+                "grok-4-0709": 2000000,  # 2M tokens
+                "grok-2-1212": 200000,  # Conservative
+                "grok-2-vision": 200000,  # Conservative
+                "grok-beta": 200000  # Conservative
+            }
+
+            # If user specified a high max_total_context_lines but model can't handle it, warn and adjust
+            model_limit = model_limits.get(model, 200000)
+            if max_total_context_lines > model_limit:
+                # If user explicitly set a high limit and model supports it, use it
+                if model in ["grok-4-fast-reasoning", "grok-4-0709"]:
+                    # These models support large context, use the user's setting
+                    effective_limit = max_total_context_lines
+                else:
+                    # Model doesn't support large context, use model limit
+                    effective_limit = model_limit
+                    logger.warning(f"Model {model} has a context limit of {model_limit} lines, adjusting from {max_total_context_lines}")
+            else:
+                effective_limit = max_total_context_lines
+
+            # Create model-specific client if needed
+            if model != self.grok_client.model:
+                from lib.grok_client import GrokClient
+                model_client = GrokClient(model=model, temperature=self.grok_client.temperature)
+            else:
+                model_client = self.grok_client
+
             # Create a new session or continue existing one
             session_id = kwargs.get('session_id')
             if not session_id:
@@ -157,7 +198,7 @@ class DiscussTool(BaseTool):
                     file_context, file_metadata = ContextLoader.load_context(
                         context_files,
                         max_lines_per_file=max_context_lines,
-                        max_total_lines=max_total_context_lines,
+                        max_total_lines=effective_limit,
                         context_type=context_type
                     )
                 
@@ -269,7 +310,7 @@ class DiscussTool(BaseTool):
                     continue
                 
                 # Generate new turn
-                response = await self.grok_client.ask_with_history(
+                response = await model_client.ask_with_history(
                     messages=messages,
                     stream=False
                 )
