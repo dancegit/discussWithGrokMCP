@@ -102,7 +102,7 @@ class EnhancedMCPServer:
         global grok_client, session_manager, tools
         
         # Initialize clients
-        model = os.getenv('GROK_MODEL', 'grok-4-fast-reasoning')
+        model = os.getenv('GROK_MODEL', 'grok-code-fast')
         temperature = float(os.getenv('GROK_TEMPERATURE', '0.7'))
         
         grok_client = GrokClient(model=model, temperature=temperature)
@@ -385,7 +385,7 @@ class EnhancedMCPServer:
             }
         elif uri == "grok://config":
             return {
-                "model": os.getenv('GROK_MODEL', 'grok-4-fast-reasoning'),
+                "model": os.getenv('GROK_MODEL', 'grok-code-fast'),
                 "temperature": float(os.getenv('GROK_TEMPERATURE', '0.7')),
                 "max_tokens": int(os.getenv('GROK_MAX_TOKENS', '4096')),
                 "streaming": streaming_enabled,

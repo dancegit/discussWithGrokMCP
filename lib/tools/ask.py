@@ -32,8 +32,8 @@ class AskTool(BaseTool):
                 "model": {
                     "type": "string",
                     "description": "Model to use",
-                    "enum": ["grok-4-fast-reasoning", "grok-4-0709", "grok-2-1212", "grok-2-vision", "grok-beta"],
-                    "default": "grok-4-fast-reasoning"
+                    "enum": ["grok-code-fast", "grok-4-fast-reasoning", "grok-4-0709", "grok-2-1212", "grok-2-vision", "grok-beta"],
+                    "default": "grok-code-fast"
                 },
                 "temperature": {
                     "type": "number",
@@ -56,7 +56,7 @@ class AskTool(BaseTool):
         """Execute the ask tool."""
         try:
             # Use provided parameters or defaults
-            actual_model = model or "grok-4-fast-reasoning"
+            actual_model = model or "grok-code-fast"
             actual_temp = temperature if temperature is not None else 0.7
             
             # For now, ignore streaming (Phase 2)

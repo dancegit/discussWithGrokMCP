@@ -42,7 +42,7 @@ class GrokClient:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "grok-4-fast-reasoning",
+        model: str = "grok-code-fast",
         temperature: float = 0.7,
         max_retries: int = 3,
         retry_delay: float = 1.0
@@ -51,7 +51,7 @@ class GrokClient:
         
         Args:
             api_key: X.AI API key (defaults to env var XAI_API_KEY)
-            model: Model to use (default: grok-4-fast-reasoning)
+            model: Model to use (default: grok-code-fast)
             temperature: Sampling temperature (default: 0.7)
             max_retries: Maximum number of retry attempts
             retry_delay: Initial delay between retries (exponential backoff)
