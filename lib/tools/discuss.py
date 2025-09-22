@@ -169,13 +169,6 @@ class DiscussTool(BaseTool):
             else:
                 effective_limit = max_total_context_lines
 
-            # Create model-specific client if needed
-            if model != self.grok_client.model:
-                from lib.grok_client import GrokClient
-                model_client = GrokClient(model=model, temperature=self.grok_client.temperature)
-            else:
-                model_client = self.grok_client
-
             # Create a new session or continue existing one
             session_id = kwargs.get('session_id')
             if not session_id:
@@ -183,11 +176,15 @@ class DiscussTool(BaseTool):
                 if not topic:
                     return "Error: 'topic' parameter is required when creating a new discussion"
 
-                # Store pagination settings with the session
+                # Store pagination and model settings with the session
                 pagination_settings = {
                     "turns_per_page": turns_per_page,
                     "max_turns": max_turns,
-                    "paginate": paginate
+                    "paginate": paginate,
+                    "model": model,
+                    "max_context_lines": max_context_lines,
+                    "max_total_context_lines": effective_limit,
+                    "context_type": context_type
                 }
                 session_id = self.session_manager.create_session(topic, pagination_settings)
                 
@@ -226,7 +223,7 @@ class DiscussTool(BaseTool):
                     return f"Error: Session {session_id} not found"
                 messages = session['messages']
 
-                # Retrieve pagination settings from session if they exist
+                # Retrieve pagination and model settings from session if they exist
                 if 'pagination' in session and session['pagination']:
                     stored_pagination = session['pagination']
                     # Use stored values if not explicitly provided
@@ -236,10 +233,26 @@ class DiscussTool(BaseTool):
                         max_turns = stored_pagination.get('max_turns', max_turns)
                     if 'paginate' not in kwargs:
                         paginate = stored_pagination.get('paginate', paginate)
+                    if 'model' not in kwargs and not model:
+                        model = stored_pagination.get('model', model or 'grok-code-fast')
+                    if 'max_context_lines' not in kwargs:
+                        max_context_lines = stored_pagination.get('max_context_lines', max_context_lines)
+                    if 'max_total_context_lines' not in kwargs:
+                        max_total_context_lines = stored_pagination.get('max_total_context_lines', max_total_context_lines)
+                        effective_limit = max_total_context_lines  # Use stored limit
+                    if 'context_type' not in kwargs:
+                        context_type = stored_pagination.get('context_type', context_type)
 
                 # Extract context_files from kwargs if continuing a session
                 context_files = kwargs.get('context_files')
-            
+
+            # Create model-specific client after determining the final model
+            if model != self.grok_client.model:
+                from lib.grok_client import GrokClient
+                model_client = GrokClient(model=model, temperature=self.grok_client.temperature)
+            else:
+                model_client = self.grok_client
+
             # Calculate pagination
             if paginate:
                 start_turn = (page - 1) * turns_per_page
@@ -256,6 +269,7 @@ class DiscussTool(BaseTool):
             # Start the discussion
             result = f"Discussion on: {topic}\n"
             result += f"Session ID: {session_id}\n"
+            result += f"Model: {model} (Context limit: {effective_limit:,} lines)\n"
             
             if context_files:
                 # Format context files for display
