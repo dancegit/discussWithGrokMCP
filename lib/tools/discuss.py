@@ -224,6 +224,7 @@ class DiscussTool(BaseTool):
                 messages = session['messages']
 
                 # Retrieve pagination and model settings from session if they exist
+                session_updated = False
                 if 'pagination' in session and session['pagination']:
                     stored_pagination = session['pagination']
                     # Use stored values if not explicitly provided
@@ -242,6 +243,80 @@ class DiscussTool(BaseTool):
                         effective_limit = max_total_context_lines  # Use stored limit
                     if 'context_type' not in kwargs:
                         context_type = stored_pagination.get('context_type', context_type)
+                else:
+                    # Session exists but has no pagination data - auto-repair
+                    logger.info(f"Auto-repairing session {session_id} - adding missing pagination settings")
+                    session['pagination'] = {}
+                    session_updated = True
+
+                # Auto-repair: Check for missing critical settings and add defaults
+                if 'pagination' in session:
+                    pagination = session['pagination']
+                    repairs_made = []
+
+                    # Check and repair missing model
+                    if 'model' not in pagination:
+                        # Try to infer model from topic or default to grok-4-fast-reasoning for large contexts
+                        if 'VSO' in session.get('topic', '') or 'System' in session.get('topic', ''):
+                            pagination['model'] = 'grok-4-fast-reasoning'
+                            repairs_made.append('model=grok-4-fast-reasoning (inferred from topic)')
+                        else:
+                            pagination['model'] = model or 'grok-code-fast'
+                            repairs_made.append('model=grok-code-fast (default)')
+                        session_updated = True
+
+                    # Check and repair missing context limits
+                    if 'max_total_context_lines' not in pagination:
+                        # Default to large context if model supports it
+                        if pagination.get('model') in ['grok-4-fast-reasoning', 'grok-4-0709']:
+                            pagination['max_total_context_lines'] = 1800000
+                            repairs_made.append('max_total_context_lines=1,800,000')
+                        else:
+                            pagination['max_total_context_lines'] = 180000
+                            repairs_made.append('max_total_context_lines=180,000')
+                        session_updated = True
+
+                    # Check other missing settings
+                    if 'max_context_lines' not in pagination:
+                        pagination['max_context_lines'] = 1000
+                        repairs_made.append('max_context_lines=1000')
+                        session_updated = True
+
+                    if 'context_type' not in pagination:
+                        pagination['context_type'] = 'code'
+                        repairs_made.append('context_type=code')
+                        session_updated = True
+
+                    if 'turns_per_page' not in pagination:
+                        pagination['turns_per_page'] = 2
+                        repairs_made.append('turns_per_page=2')
+                        session_updated = True
+
+                    if 'max_turns' not in pagination:
+                        pagination['max_turns'] = 5
+                        repairs_made.append('max_turns=5')
+                        session_updated = True
+
+                    if 'paginate' not in pagination:
+                        pagination['paginate'] = True
+                        repairs_made.append('paginate=true')
+                        session_updated = True
+
+                    if repairs_made:
+                        logger.info(f"Auto-repaired session {session_id}: {', '.join(repairs_made)}")
+
+                    # Update session values from repaired pagination
+                    model = pagination.get('model', model or 'grok-code-fast')
+                    max_total_context_lines = pagination.get('max_total_context_lines', max_total_context_lines)
+                    effective_limit = max_total_context_lines
+                    max_context_lines = pagination.get('max_context_lines', max_context_lines)
+                    context_type = pagination.get('context_type', context_type)
+
+                # Save repaired session if changes were made
+                if session_updated:
+                    from datetime import datetime
+                    session['updated_at'] = datetime.now().isoformat()
+                    self.session_manager._save_session(session_id)
 
                 # Extract context_files from kwargs if continuing a session
                 context_files = kwargs.get('context_files')
