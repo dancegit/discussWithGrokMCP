@@ -253,11 +253,21 @@ class ContinueSessionTool(BaseTool):
             self.session_manager.add_message(session_id, "user", full_message)
             
             # Build conversation history
-            messages = [{"role": msg["role"], "content": msg["content"]} 
+            messages = [{"role": msg["role"], "content": msg["content"]}
                        for msg in session["messages"]]
-            
-            # Get response from Grok
-            response = await self.grok_client.ask_with_history(
+
+            # Check if session has a stored model
+            model_client = self.grok_client
+            if 'pagination' in session and session['pagination']:
+                stored_model = session['pagination'].get('model')
+                if stored_model and stored_model != self.grok_client.model:
+                    # Create a client with the stored model
+                    from lib.grok_client import GrokClient
+                    model_client = GrokClient(model=stored_model, temperature=self.grok_client.temperature)
+                    logger.info(f"Using stored model from session: {stored_model}")
+
+            # Get response from Grok using the appropriate model
+            response = await model_client.ask_with_history(
                 messages=messages,
                 stream=False
             )
