@@ -491,34 +491,72 @@ async def main():
     """Main loop - read JSON-RPC from stdin, write to stdout."""
     server = EnhancedMCPServer()
     logger.info("Starting enhanced MCP server main loop")
-    
+
     # Set up async stdin reading
     reader = asyncio.StreamReader()
     protocol = asyncio.StreamReaderProtocol(reader)
-    
+    use_async = False
+
     try:
         await asyncio.get_event_loop().connect_read_pipe(lambda: protocol, sys.stdin)
-    except:
+        use_async = True
+        logger.info("Using async stdin reader")
+    except Exception as e:
         # Fallback for systems that don't support async pipes
-        pass
-    
+        logger.info(f"Async pipe not available ({e}), using sync fallback")
+
     buffer = ""
-    
+    consecutive_empty_reads = 0
+    max_empty_reads = 50  # Allow up to 5 seconds of empty reads (50 * 0.1s)
+
     while True:
         try:
+            chunk_received = False
+
             # Try async read
-            try:
-                chunk = await asyncio.wait_for(reader.read(1024), timeout=0.1)
-                if chunk:
-                    buffer += chunk.decode('utf-8')
-            except (asyncio.TimeoutError, AttributeError):
-                # Fallback to sync read
+            if use_async:
+                try:
+                    chunk = await asyncio.wait_for(reader.read(1024), timeout=0.1)
+                    if chunk:
+                        buffer += chunk.decode('utf-8')
+                        chunk_received = True
+                        consecutive_empty_reads = 0
+                    elif len(chunk) == 0 and reader.at_eof():
+                        # EOF detected - stdin was closed
+                        logger.warning("stdin closed (EOF detected) - client disconnected")
+                        break
+                except asyncio.TimeoutError:
+                    # Normal timeout, no data available
+                    pass
+                except Exception as e:
+                    logger.error(f"Error reading from async stdin: {e}", exc_info=True)
+                    use_async = False  # Fall back to sync
+
+            # Fallback to sync read
+            if not use_async:
                 import select
-                if select.select([sys.stdin], [], [], 0.1)[0]:
-                    line = sys.stdin.readline()
-                    if line:
-                        buffer += line
-            
+                try:
+                    if select.select([sys.stdin], [], [], 0.1)[0]:
+                        line = sys.stdin.readline()
+                        if line:
+                            buffer += line
+                            chunk_received = True
+                            consecutive_empty_reads = 0
+                        else:
+                            # Empty readline() means EOF
+                            logger.warning("stdin closed (EOF on readline) - client disconnected")
+                            break
+                except Exception as e:
+                    logger.error(f"Error reading from sync stdin: {e}", exc_info=True)
+
+            # Track consecutive empty reads to detect stalled connections
+            if not chunk_received:
+                consecutive_empty_reads += 1
+                if consecutive_empty_reads >= max_empty_reads:
+                    logger.warning(f"No data received for {max_empty_reads * 0.1}s, checking connection health")
+                    # Reset counter and continue - this is normal for idle connections
+                    consecutive_empty_reads = 0
+
             # Process complete JSON objects
             while buffer:
                 try:
@@ -527,34 +565,47 @@ async def main():
                         if line.strip():
                             request = json.loads(line)
                             logger.debug(f"Received: {request}")
-                            
+
                             # Handle request
                             response = await server.handle_request(request)
-                            
+
                             # Send response if not a notification
                             if response:
                                 response_str = json.dumps(response)
-                                sys.stdout.write(response_str + '\n')
-                                sys.stdout.flush()
-                                logger.debug(f"Sent: {response_str}")
+                                try:
+                                    sys.stdout.write(response_str + '\n')
+                                    sys.stdout.flush()
+                                    logger.debug(f"Sent response for method: {request.get('method', 'unknown')}")
+                                except BrokenPipeError:
+                                    logger.error("Broken pipe - client disconnected while sending response")
+                                    return
+                                except Exception as e:
+                                    logger.error(f"Error writing response: {e}", exc_info=True)
+                                    return
                     else:
                         break
-                        
+
                 except json.JSONDecodeError as e:
                     logger.error(f"JSON decode error: {e}, buffer: {buffer[:100]}")
                     buffer = ""  # Clear bad buffer
                     break
                 except Exception as e:
                     logger.error(f"Processing error: {e}", exc_info=True)
-                    break
-                    
+                    # Don't break - continue processing other requests
+
         except KeyboardInterrupt:
-            logger.info("Shutdown requested")
+            logger.info("Shutdown requested via KeyboardInterrupt")
+            break
+        except BrokenPipeError:
+            logger.error("Broken pipe in main loop - client disconnected")
             break
         except Exception as e:
             logger.error(f"Main loop error: {e}", exc_info=True)
-    
-    logger.info("Server stopped")
+            # Continue running unless it's a fatal error
+            import traceback
+            traceback.print_exc()
+
+    logger.info("Server stopped gracefully")
 
 
 if __name__ == "__main__":
