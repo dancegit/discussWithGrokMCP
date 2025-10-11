@@ -126,6 +126,13 @@ class DiscussTool(BaseTool):
                     "description": "Model to use for the discussion",
                     "enum": ["grok-code-fast", "grok-4-fast-reasoning", "grok-4-0709", "grok-2-1212", "grok-2-vision", "grok-beta"],
                     "default": "grok-code-fast"
+                },
+                "max_tokens_per_turn": {
+                    "type": "integer",
+                    "description": "Maximum tokens per turn in paginated responses (default: 20000). Prevents MCP response size errors.",
+                    "minimum": 1000,
+                    "maximum": 100000,
+                    "default": 20000
                 }
             },
             "required": []
@@ -138,7 +145,8 @@ class DiscussTool(BaseTool):
                      max_total_context_lines: int = 2000000,
                      max_turns: int = 3, expert_mode: bool = False,
                      page: int = 1, turns_per_page: int = 2,
-                     paginate: bool = True, model: str = None, **kwargs) -> str:
+                     paginate: bool = True, model: str = None,
+                     max_tokens_per_turn: int = 20000, **kwargs) -> str:
         """Start a discussion with optional file context and pagination support."""
         try:
             # Handle model selection and adjust context limits
@@ -184,7 +192,8 @@ class DiscussTool(BaseTool):
                     "model": model,
                     "max_context_lines": max_context_lines,
                     "max_total_context_lines": effective_limit,
-                    "context_type": context_type
+                    "context_type": context_type,
+                    "max_tokens_per_turn": max_tokens_per_turn
                 }
                 session_id = self.session_manager.create_session(topic, pagination_settings)
                 
@@ -243,6 +252,8 @@ class DiscussTool(BaseTool):
                         effective_limit = max_total_context_lines  # Use stored limit
                     if 'context_type' not in kwargs:
                         context_type = stored_pagination.get('context_type', context_type)
+                    if 'max_tokens_per_turn' not in kwargs:
+                        max_tokens_per_turn = stored_pagination.get('max_tokens_per_turn', max_tokens_per_turn)
                 else:
                     # Session exists but has no pagination data - auto-repair
                     logger.info(f"Auto-repairing session {session_id} - adding missing pagination settings")
@@ -302,6 +313,11 @@ class DiscussTool(BaseTool):
                         repairs_made.append('paginate=true')
                         session_updated = True
 
+                    if 'max_tokens_per_turn' not in pagination:
+                        pagination['max_tokens_per_turn'] = 20000
+                        repairs_made.append('max_tokens_per_turn=20000')
+                        session_updated = True
+
                     if repairs_made:
                         logger.info(f"Auto-repaired session {session_id}: {', '.join(repairs_made)}")
 
@@ -311,6 +327,7 @@ class DiscussTool(BaseTool):
                     effective_limit = max_total_context_lines
                     max_context_lines = pagination.get('max_context_lines', max_context_lines)
                     context_type = pagination.get('context_type', context_type)
+                    max_tokens_per_turn = pagination.get('max_tokens_per_turn', max_tokens_per_turn)
 
                 # Save repaired session if changes were made
                 if session_updated:
@@ -390,25 +407,34 @@ class DiscussTool(BaseTool):
                     # Get existing turn from messages
                     assistant_messages = [m for m in messages if m['role'] == 'assistant']
                     if turn < len(assistant_messages):
-                        result += f"Turn {turn + 1}:\n{assistant_messages[turn]['content']}\n\n"
-                        
+                        # Truncate existing turn content if needed
+                        turn_content = assistant_messages[turn]['content']
+                        truncated_content, was_truncated = self._truncate_turn_content(
+                            turn_content, max_tokens_per_turn, turn + 1, session_id
+                        )
+                        result += f"Turn {turn + 1}:\n{truncated_content}\n\n"
+
                         # Add follow-up if exists
                         user_messages = [m for m in messages if m['role'] == 'user']
                         if turn + 1 < len(user_messages) - 1:  # -1 for initial prompt
                             result += f"Follow-up: {user_messages[turn + 2]['content']}\n\n"
                     continue
-                
+
                 # Generate new turn
                 response = await model_client.ask_with_history(
                     messages=messages,
                     stream=False
                 )
-                
+
                 # Add to session
                 self.session_manager.add_message(session_id, "assistant", response.content)
                 messages.append({"role": "assistant", "content": response.content})
-                
-                result += f"Turn {turn + 1}:\n{response.content}\n\n"
+
+                # Truncate new turn content if needed
+                truncated_response, was_truncated = self._truncate_turn_content(
+                    response.content, max_tokens_per_turn, turn + 1, session_id
+                )
+                result += f"Turn {turn + 1}:\n{truncated_response}\n\n"
                 
                 # Generate follow-up question if not last turn on this page
                 if turn < end_turn - 1:
@@ -466,3 +492,49 @@ class DiscussTool(BaseTool):
                 return "Can you elaborate on the technical implications and potential edge cases?"
             else:
                 return "Can you provide more details or examples?"
+
+    def _estimate_tokens(self, text: str) -> int:
+        """Estimate token count for text. Uses ~4 chars per token heuristic."""
+        return len(text) // 4
+
+    def _truncate_turn_content(self, content: str, max_tokens: int, turn_number: int, session_id: str) -> tuple[str, bool]:
+        """
+        Truncate turn content if it exceeds max_tokens.
+
+        Returns:
+            tuple: (truncated_content, was_truncated)
+        """
+        estimated_tokens = self._estimate_tokens(content)
+
+        if estimated_tokens <= max_tokens:
+            return content, False
+
+        # Calculate character limit based on token estimate
+        char_limit = max_tokens * 4
+
+        # Find a good truncation point
+        truncated = content[:char_limit]
+
+        # Try to truncate at paragraph boundary
+        last_paragraph = truncated.rfind('\n\n')
+        if last_paragraph > char_limit * 0.7:  # If paragraph break is in last 30%
+            truncated = truncated[:last_paragraph]
+        else:
+            # Try to truncate at sentence boundary
+            last_sentence = max(
+                truncated.rfind('. '),
+                truncated.rfind('! '),
+                truncated.rfind('? ')
+            )
+            if last_sentence > char_limit * 0.7:
+                truncated = truncated[:last_sentence + 1]
+
+        # Add truncation notice
+        original_tokens = estimated_tokens
+        truncated_tokens = self._estimate_tokens(truncated)
+
+        truncation_notice = f"\n\n[... Content truncated: showing {truncated_tokens:,} of {original_tokens:,} tokens ...]\n"
+        truncation_notice += f"[To view full content, use: grok_continue_session(session_id='{session_id}', "
+        truncation_notice += f"message='Show me the complete response for turn {turn_number}')]"
+
+        return truncated + truncation_notice, True
