@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/clauderun/discussWithGrokMCP/logs/.f9ae428259cf77c000b67f5eec0aebc4437dd76f-audit.json",
+    "files": [
+        {
+            "date": 1757312297661,
+            "name": "/home/clauderun/discussWithGrokMCP/logs/mcp-puppeteer-2025-09-08.log",
+            "hash": "6979b1ffc9008ee9579b5cb48eb571caea51d0f7dd568b7a43ae87b2ade47b94"
+        }
+    ],
+    "hashType": "sha256"
+}

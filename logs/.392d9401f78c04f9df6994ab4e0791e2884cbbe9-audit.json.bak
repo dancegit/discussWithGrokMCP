@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/per/gitrepos/discussWithGrokMCP/logs/.392d9401f78c04f9df6994ab4e0791e2884cbbe9-audit.json",
+    "files": [
+        {
+            "date": 1755071801744,
+            "name": "/home/per/gitrepos/discussWithGrokMCP/logs/mcp-puppeteer-2025-08-13.log",
+            "hash": "dd1da63f7bf5bac405ab160a858cd66b359835e3fece0aa0eb8e2e1fd98123d9"
+        }
+    ],
+    "hashType": "sha256"
+}

@@ -1,0 +1,12 @@
+{
+  "enabledMcpjsonServers": [
+    "grok",
+    "context7",
+    "supabase",
+    "brave-search",
+    "puppeteer",
+    "firecrawl",
+    "playwright"
+  ],
+  "enableAllProjectMcpServers": true
+}

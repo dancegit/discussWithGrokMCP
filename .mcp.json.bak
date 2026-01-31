@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "grok": {
+      "type": "stdio",
+      "command": "/home/clauderun/.local/bin/uv",
+      "args": [
+        "--project",
+        "/home/clauderun/discussWithGrokMCP",
+        "run",
+        "/home/clauderun/discussWithGrokMCP/enhanced_mcp.py"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "sbp_f9753529ac6080303f156dec8f2e641e96130e22"
+      ]
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "BSA1RkmN4oBGhYm6rwRVjtgFNEseNTp"
+      }
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ],
+      "env": {}
+    }
+  }
+}
