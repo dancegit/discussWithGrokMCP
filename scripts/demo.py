@@ -18,6 +18,11 @@ DIM, BOLD, CYAN, GREEN, RED, RESET = (
     "\033[2m", "\033[1m", "\033[36m", "\033[32m", "\033[31m", "\033[0m"
 )
 
+BACKEND_LABELS = {
+    "GrokClient": "xAI API key",
+    "GrokCliClient": "grok CLI sign-in (OAuth)",
+}
+
 
 class StdioClient:
     def __init__(self) -> None:
@@ -75,7 +80,12 @@ def main() -> int:
     try:
         info = client.request("initialize", {"protocolVersion": "2024-11-05"})["serverInfo"]
         tools = [t["name"] for t in client.request("tools/list")["tools"]]
-        print(f"{BOLD}{info['name']} {info['version']}{RESET} {DIM}· {len(tools)} tools{RESET}")
+        health = client.call_tool("grok_health", {"verbose": True})
+        backend = next((line.split(":", 1)[1].strip() for line in health.splitlines()
+                        if line.strip().startswith("Backend:")), "unknown")
+        backend = BACKEND_LABELS.get(backend, backend)
+        print(f"{BOLD}{info['name']} {info['version']}{RESET} {DIM}· {len(tools)} tools · "
+              f"backend: {backend}{RESET}")
         for line in textwrap.wrap(", ".join(tools), 96):
             print(f"  {DIM}{line}{RESET}")
 

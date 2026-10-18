@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 # Add lib to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lib import GrokClient
+from lib.grok_client import create_client
 from lib.tools import (
     AskTool,
     DiscussTool,
@@ -113,7 +113,7 @@ class EnhancedMCPServer:
         model = os.getenv('GROK_MODEL', 'grok-code-fast')
         temperature = float(os.getenv('GROK_TEMPERATURE', '0.7'))
         
-        grok_client = GrokClient(model=model, temperature=temperature)
+        grok_client = create_client(model=model, temperature=temperature)
         session_manager = SessionManager(Path("./sessions"))
         
         # Initialize tools

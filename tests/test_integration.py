@@ -189,7 +189,7 @@ class TestToolExecution:
         from enhanced_mcp import EnhancedMCPServer
         
         # Mock the Grok client
-        with patch('enhanced_mcp.GrokClient') as MockClient:
+        with patch('enhanced_mcp.create_client') as MockClient:
             mock_instance = MockClient.return_value
             mock_instance.ask = AsyncMock(return_value=AsyncMock(content="Mocked response"))
             
@@ -221,9 +221,9 @@ class TestToolExecution:
         """Test health check tool."""
         from enhanced_mcp import EnhancedMCPServer
         
-        with patch('enhanced_mcp.GrokClient') as MockClient:
+        with patch('enhanced_mcp.create_client') as MockClient:
             mock_instance = MockClient.return_value
-            mock_instance.ask = AsyncMock(return_value=AsyncMock(content="pong"))
+            mock_instance.check_connection = AsyncMock(return_value=True)
             mock_instance.get_total_tokens_used = lambda: 100
             
             server = EnhancedMCPServer()
@@ -257,7 +257,7 @@ class TestResourceHandling:
         """Test reading config resource."""
         from enhanced_mcp import EnhancedMCPServer
         
-        with patch('enhanced_mcp.GrokClient'):
+        with patch('enhanced_mcp.create_client'):
             server = EnhancedMCPServer()
             
             request = {
@@ -289,7 +289,7 @@ class TestResourceHandling:
         """Test reading stats resource."""
         from enhanced_mcp import EnhancedMCPServer
         
-        with patch('enhanced_mcp.GrokClient') as MockClient:
+        with patch('enhanced_mcp.create_client') as MockClient:
             mock_instance = MockClient.return_value
             mock_instance.get_total_tokens_used = lambda: 42
             
@@ -328,7 +328,7 @@ class TestErrorHandling:
         """Test handling of tool execution errors."""
         from enhanced_mcp import EnhancedMCPServer
         
-        with patch('enhanced_mcp.GrokClient') as MockClient:
+        with patch('enhanced_mcp.create_client') as MockClient:
             mock_instance = MockClient.return_value
             mock_instance.ask = AsyncMock(side_effect=Exception("API Error"))
             
@@ -361,7 +361,7 @@ class TestErrorHandling:
         """Test calling non-existent tool."""
         from enhanced_mcp import EnhancedMCPServer
         
-        with patch('enhanced_mcp.GrokClient'):
+        with patch('enhanced_mcp.create_client'):
             server = EnhancedMCPServer()
             
             request = {
@@ -393,7 +393,7 @@ class TestResponseCache:
         import enhanced_mcp
         from conftest import FakeGrokClient
 
-        monkeypatch.setattr(enhanced_mcp, "GrokClient", FakeGrokClient)
+        monkeypatch.setattr(enhanced_mcp, "create_client", FakeGrokClient)
         monkeypatch.setenv("MCP_ENABLE_CACHING", "true")
         enhanced_mcp.cache.clear()
         enhanced_mcp.cache_size = 0

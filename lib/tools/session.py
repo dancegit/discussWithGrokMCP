@@ -262,8 +262,8 @@ class ContinueSessionTool(BaseTool):
                 stored_model = session['pagination'].get('model')
                 if stored_model and stored_model != self.grok_client.model:
                     # Create a client with the stored model
-                    from lib.grok_client import GrokClient
-                    model_client = GrokClient(model=stored_model, temperature=self.grok_client.temperature)
+                    from lib.grok_client import create_client
+                    model_client = create_client(model=stored_model, temperature=self.grok_client.temperature)
                     logger.info(f"Using stored model from session: {stored_model}")
 
             # Get response from Grok using the appropriate model

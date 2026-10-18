@@ -48,6 +48,9 @@ class FakeGrokClient:
                                **kwargs: Any) -> GrokResponse:
         return self._respond(messages=messages, **kwargs)
 
+    async def check_connection(self) -> bool:
+        return True
+
     def estimate_tokens(self, text: str) -> int:
         return len(text) // 4
 
@@ -60,15 +63,19 @@ class FakeGrokClient:
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "live: calls the real xAI API (needs XAI_API_KEY)")
+    config.addinivalue_line("markers", "live_cli: runs the real grok CLI (needs RUN_GROK_CLI_TESTS=1)")
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: List[pytest.Item]) -> None:
-    if os.getenv("XAI_API_KEY") and os.getenv("XAI_API_KEY") != DUMMY_KEY:
-        return
+    has_key = bool(os.getenv("XAI_API_KEY")) and os.getenv("XAI_API_KEY") != DUMMY_KEY
+    run_cli = os.getenv("RUN_GROK_CLI_TESTS") == "1"
     skip_live = pytest.mark.skip(reason="XAI_API_KEY not set; live API test skipped")
+    skip_cli = pytest.mark.skip(reason="set RUN_GROK_CLI_TESTS=1 to run live grok CLI tests")
     for item in items:
-        if "live" in item.keywords:
+        if "live" in item.keywords and not has_key:
             item.add_marker(skip_live)
+        if "live_cli" in item.keywords and not run_cli:
+            item.add_marker(skip_cli)
 
 
 @pytest.fixture(autouse=True)
@@ -80,9 +87,10 @@ def _isolated_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def _no_real_api(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
     """Swap the real client for FakeGrokClient in every non-live test."""
-    if "live" in request.keywords:
+    if "live" in request.keywords or "live_cli" in request.keywords:
         return
     monkeypatch.setenv("XAI_API_KEY", DUMMY_KEY)
+    monkeypatch.setenv("GROK_BACKEND", "api")
     monkeypatch.setattr("lib.grok_client.GrokClient", FakeGrokClient)
 
 

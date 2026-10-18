@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite passes on a clean checkout (was 46 passed / 14 failed): the xAI client is faked in `tests/conftest.py`, stale assertions updated.
 
 ### Added
+- `cli` backend (`GROK_BACKEND`): use a signed-in Grok account via the official `grok` CLI instead of an API key. Runs are sandboxed (`--sandbox strict`), tool-less, and run with a throwaway `HOME` so none of the user's Claude/Cursor setup (instructions, permission rules, agents, skills, hooks, MCP servers) loads; live tests verify this against the real CLI.
+- `grok_health` probes the backend with `check_connection()` (a model list for the CLI, not a billed prompt) and reports which backend is active.
+- Demo GIF in the README, recorded with `docs/demo.tape` and shortened with `scripts/squash_gif.py`.
 - `scripts/demo.py` stdio demo client and `docs/demo.tape` (VHS) for recording the README demo.
 - GitHub Actions CI: pytest on Python 3.11-3.13 and a gitleaks scan of full history.
 - Tests for `grok_list_sessions` and `grok_continue_session`.

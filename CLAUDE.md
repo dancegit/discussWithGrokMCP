@@ -8,7 +8,11 @@ MCP server that exposes xAI Grok to Claude Code. One supported entry point:
 `enhanced_mcp.py` (JSON-RPC 2.0 over stdio). Older prototypes live in `archive/` and are
 not maintained. Do not add new entry points.
 
-- `lib/grok_client.py` - async OpenAI-compatible xAI client, retry with backoff
+- `lib/grok_client.py` - async OpenAI-compatible xAI client, retry with backoff;
+  `create_client()` picks the backend from `GROK_BACKEND` (auto/api/cli)
+- `lib/grok_cli_client.py` - backend that runs the signed-in `grok` CLI headless. Every
+  run is locked down (tools removed, `--sandbox strict`, Claude/Cursor compat scanning off).
+  Never loosen `LOCKDOWN_ARGS` / `ISOLATION_ENV` without re-running the live_cli tests.
 - `lib/tools/` - one module per tool (`ask`, `discuss`, `session`, `context`, `health`),
   `context_loader.py` resolves files/dirs/globs/line ranges, `base.py` is the tool base class
 - `lib/session_manager.py`, `storage_manager.py`, `baseline_generator.py`,
@@ -28,7 +32,11 @@ Python 3.11-3.13 (`.python-version` pins 3.12; 3.14 cannot build the locked pyda
 uv sync
 uv run pytest            # offline suite, xAI client faked
 uv run pytest -m live    # real API, needs XAI_API_KEY
+RUN_GROK_CLI_TESTS=1 uv run pytest -m live_cli   # containment checks on the real grok CLI
 ```
+
+Construct clients with `create_client()`, never `GrokClient(...)` directly, so the backend
+setting is honoured.
 
 `tests/conftest.py` replaces `lib.grok_client.GrokClient` with `FakeGrokClient` and sets a
 dummy key for every test not marked `live`. New tests must not need network access; use
@@ -41,5 +49,6 @@ CI (`.github/workflows/ci.yml`) runs pytest on 3.11/3.12/3.13 and gitleaks over 
 - Never commit `.env`, `.mcp.json`, logs, session JSON, or `*.bak` files (all git-ignored).
 - No absolute machine paths in code, scripts, or examples.
 - Tool handlers return error strings rather than raising.
-- Context files are read with the server's own permissions; there is no path sandbox.
+- Context files are read with the server's own permissions; there is no path sandbox on
+  the server side. Treat their contents as untrusted when they reach the model.
 - Add tests for new behaviour and update README.md when tools or settings change.

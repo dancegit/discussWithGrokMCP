@@ -395,12 +395,7 @@ class TestHealthCheckTool:
         client = Mock()
         client.model = "grok-code-fast"
         client.temperature = 0.7
-        client.ask = AsyncMock(return_value=GrokResponse(
-            content="pong",
-            tokens_used=1,
-            model="grok-4-0709",
-            timestamp=1234567890
-        ))
+        client.check_connection = AsyncMock(return_value=True)
         return client
     
     @pytest.fixture
@@ -425,13 +420,13 @@ class TestHealthCheckTool:
         
         assert "Health Status:" in result
         assert "Diagnostics:" in result
-        assert "Version:" in result
+        assert "Backend:" in result
         assert "Features:" in result
     
     @pytest.mark.asyncio
     async def test_health_check_api_failure(self, health_tool, mock_client):
         """Test health check with API failure."""
-        mock_client.ask.side_effect = Exception("API error")
+        mock_client.check_connection.side_effect = Exception("API error")
         
         result = await health_tool.execute()
         

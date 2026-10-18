@@ -50,12 +50,8 @@ class HealthCheckTool(BaseTool):
             
             start = time.time()
             try:
-                response = await self.grok_client.ask(
-                    prompt="ping",
-                    max_tokens=1,
-                    stream=False
-                )
-                api_status = "connected" if response else "error"
+                connected = await self.grok_client.check_connection()
+                api_status = "connected" if connected else "error"
                 latency_ms = int((time.time() - start) * 1000)
             except Exception as e:
                 api_status = "disconnected"
@@ -71,7 +67,7 @@ class HealthCheckTool(BaseTool):
             
             if verbose:
                 health["diagnostics"] = {
-                    "version": "0.8.0",
+                    "backend": type(self.grok_client).__name__,
                     "features": {
                         "streaming": True,
                         "sessions": True,
@@ -95,7 +91,7 @@ class HealthCheckTool(BaseTool):
             if verbose and "diagnostics" in health:
                 result += "\nDiagnostics:\n"
                 diag = health["diagnostics"]
-                result += f"  Version: {diag['version']}\n"
+                result += f"  Backend: {diag['backend']}\n"
                 result += f"  Features: {', '.join(k for k, v in diag['features'].items() if v)}\n"
             
             return result

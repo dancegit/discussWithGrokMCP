@@ -1,5 +1,7 @@
-# Records docs/demo.gif. Needs vhs (https://github.com/charmbracelet/vhs) and XAI_API_KEY in .env.
+# Records docs/demo.gif. Needs vhs (https://github.com/charmbracelet/vhs) and either
+# XAI_API_KEY in .env or a signed-in grok CLI (GROK_BACKEND=cli). Then shorten the waits:
 #   vhs docs/demo.tape
+#   uv run --with pillow python scripts/squash_gif.py docs/demo.gif docs/demo.gif 1500 8000
 Output docs/demo.gif
 
 Set Shell "bash"

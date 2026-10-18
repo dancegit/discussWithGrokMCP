@@ -340,8 +340,8 @@ class DiscussTool(BaseTool):
 
             # Create model-specific client after determining the final model
             if model != self.grok_client.model:
-                from lib.grok_client import GrokClient
-                model_client = GrokClient(model=model, temperature=self.grok_client.temperature)
+                from lib.grok_client import create_client
+                model_client = create_client(model=model, temperature=self.grok_client.temperature)
             else:
                 model_client = self.grok_client
 

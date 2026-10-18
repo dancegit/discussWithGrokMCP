@@ -312,3 +312,26 @@ class GrokClient:
             # Restore original values
             self.model = old_model
             self.temperature = old_temp
+    async def check_connection(self) -> bool:
+        """Health probe: one minimal completion."""
+        response = await self.ask(prompt="ping", max_tokens=1, stream=False)
+        return bool(response)
+
+
+def create_client(model: str = "grok-code-fast", temperature: float = 0.7):
+    """Build the client for the configured backend.
+
+    GROK_BACKEND selects it:
+      - "api":  xAI API with XAI_API_KEY
+      - "cli":  the signed-in `grok` CLI (OAuth / SuperGrok account), see GrokCliClient
+      - "auto" (default): "api" when XAI_API_KEY is set, otherwise "cli"
+    """
+    backend = os.getenv("GROK_BACKEND", "auto").lower()
+    if backend == "auto":
+        backend = "api" if os.getenv("XAI_API_KEY") else "cli"
+    if backend == "cli":
+        from .grok_cli_client import GrokCliClient
+        return GrokCliClient(model=model, temperature=temperature)
+    if backend == "api":
+        return GrokClient(model=model, temperature=temperature)
+    raise ValueError(f"Unknown GROK_BACKEND {backend!r}; use 'auto', 'api' or 'cli'")
