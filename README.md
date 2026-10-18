@@ -8,6 +8,16 @@ An [MCP](https://modelcontextprotocol.io) server that lets Claude Code consult x
 one-off questions, multi-turn discussions that persist to disk, and questions that carry
 files, directories or glob patterns as context.
 
+```mermaid
+flowchart LR
+    CC[Claude Code] -- JSON-RPC over stdio --> S[enhanced_mcp.py]
+    S --> T[tool handlers<br/>lib/tools/]
+    T --> L[context loader<br/>files · dirs · globs · line ranges]
+    T --> C[GrokClient<br/>retry + backoff]
+    C --> X[(xAI API)]
+    T <--> D[(sessions/*.json)]
+```
+
 ## Tools
 
 | Tool | What it does |
@@ -57,16 +67,27 @@ Or copy [`.mcp.json.example`](.mcp.json.example) to `.mcp.json` and fill in the 
 All settings are environment variables; [`.env.example`](.env.example) lists every one
 the server reads.
 
+## Try it without Claude Code
+
+`scripts/demo.py` starts the server and talks to it over stdio, the same way Claude Code
+does. It lists the tools, asks a question, asks it again to show the cache, and asks
+about a line range of a source file:
+
+```bash
+uv run python scripts/demo.py
+```
+
 ## Testing
 
 ```bash
-uv run pytest            # 66 offline tests; the xAI client is faked
+uv run pytest            # 71 offline tests; the xAI client is faked
 uv run pytest -m live    # 2 tests against the real API (needs XAI_API_KEY)
 ```
 
-The offline suite covers the six tools, the file-context loader, session persistence and
-the JSON-RPC protocol (the server runs as a subprocess). A conftest fixture replaces
-`GrokClient` with an in-memory fake, so these tests need no key and no network.
+The offline suite covers the six tools, the file-context loader, session persistence,
+response caching and the JSON-RPC protocol (the server runs as a subprocess). A conftest
+fixture replaces `GrokClient` with an in-memory fake, so these tests need no key and no
+network.
 
 CI runs on every push and pull request:
 
@@ -80,7 +101,7 @@ enhanced_mcp.py        MCP server entry point (JSON-RPC over stdio)
 lib/grok_client.py     Async xAI client with retry/backoff
 lib/tools/             One module per tool, plus the context loader
 tests/                 pytest suite (offline + live)
-scripts/               Maintenance utilities (session repair)
+scripts/               Demo client and session-repair utility
 archive/               Earlier server prototypes, unmaintained
 ```
 
@@ -88,6 +109,9 @@ archive/               Earlier server prototypes, unmaintained
 
 - Context files are read with the permissions of the server process, so only point it at
   paths you are happy to send to xAI.
+- Identical `grok_ask` / `grok_ask_with_context` calls are answered from an in-memory
+  cache for `MCP_CACHE_TTL` seconds. Errors are never cached, and the session tools always
+  run.
 - Sessions and logs are written to `./sessions/` and `*.log` in the working directory
   (both are git-ignored).
 

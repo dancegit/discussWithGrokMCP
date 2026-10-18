@@ -384,3 +384,70 @@ class TestErrorHandling:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+class TestResponseCache:
+    """Repeated stateless calls are served from cache; stateful ones always run."""
+
+    @pytest.fixture
+    def server(self, monkeypatch):
+        import enhanced_mcp
+        from conftest import FakeGrokClient
+
+        monkeypatch.setattr(enhanced_mcp, "GrokClient", FakeGrokClient)
+        monkeypatch.setenv("MCP_ENABLE_CACHING", "true")
+        enhanced_mcp.cache.clear()
+        enhanced_mcp.cache_size = 0
+        server = enhanced_mcp.EnhancedMCPServer()
+        yield server, enhanced_mcp.grok_client
+        enhanced_mcp.cache.clear()
+        enhanced_mcp.cache_size = 0
+
+    @staticmethod
+    def call(name, arguments):
+        return {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": name, "arguments": arguments}}
+
+    @pytest.mark.asyncio
+    async def test_repeated_ask_hits_api_once(self, server):
+        srv, client = server
+        first = await srv.handle_request(self.call("grok_ask", {"question": "Same?"}))
+        second = await srv.handle_request(self.call("grok_ask", {"question": "Same?"}))
+        assert len(client.calls) == 1
+        assert first["result"] == second["result"]
+
+    @pytest.mark.asyncio
+    async def test_different_arguments_are_not_shared(self, server):
+        srv, client = server
+        await srv.handle_request(self.call("grok_ask", {"question": "One"}))
+        await srv.handle_request(self.call("grok_ask", {"question": "Two"}))
+        assert len(client.calls) == 2
+
+    @pytest.mark.asyncio
+    async def test_errors_are_not_cached(self, server):
+        srv, client = server
+        client.reply = "Error: upstream timeout"
+        await srv.handle_request(self.call("grok_ask", {"question": "Q"}))
+        client.reply = "Recovered"
+        response = await srv.handle_request(self.call("grok_ask", {"question": "Q"}))
+        assert len(client.calls) == 2
+        assert "Recovered" in response["result"]["content"][0]["text"]
+
+    @pytest.mark.asyncio
+    async def test_session_tools_bypass_cache(self, server):
+        import enhanced_mcp
+
+        srv, client = server
+        session_id = enhanced_mcp.session_manager.create_session("Topic")
+        args = {"session_id": session_id, "message": "Again"}
+        await srv.handle_request(self.call("grok_continue_session", args))
+        await srv.handle_request(self.call("grok_continue_session", args))
+        assert len(client.calls) == 2
+        assert len(enhanced_mcp.session_manager.get_session(session_id)["messages"]) == 4
+
+    @pytest.mark.asyncio
+    async def test_caching_can_be_disabled(self, server, monkeypatch):
+        srv, client = server
+        monkeypatch.setenv("MCP_ENABLE_CACHING", "false")
+        await srv.handle_request(self.call("grok_ask", {"question": "Q"}))
+        await srv.handle_request(self.call("grok_ask", {"question": "Q"}))
+        assert len(client.calls) == 2

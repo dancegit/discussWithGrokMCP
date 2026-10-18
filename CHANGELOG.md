@@ -13,10 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.env.example` now lists exactly the variables the server reads.
 
 ### Fixed
+- Response cache was checked after the tool had already called Grok, so it never saved an API call and could replace a fresh answer with a stale one. It is now checked first, limited to the stateless tools, and errors are not cached.
+- `serverInfo.version` now reports the package version instead of a hard-coded `0.8.0`.
 - `lib.session_manager.SessionManager` no longer crashes when constructed outside an event loop.
 - Test suite passes on a clean checkout (was 46 passed / 14 failed): the xAI client is faked in `tests/conftest.py`, stale assertions updated.
 
 ### Added
+- `scripts/demo.py` stdio demo client and `docs/demo.tape` (VHS) for recording the README demo.
 - GitHub Actions CI: pytest on Python 3.11-3.13 and a gitleaks scan of full history.
 - Tests for `grok_list_sessions` and `grok_continue_session`.
 - `live` pytest marker for tests that call the real xAI API (skipped without `XAI_API_KEY`).

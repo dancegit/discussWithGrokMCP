@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, List
 from datetime import datetime
 import uuid
+from importlib.metadata import PackageNotFoundError, version
 
 from dotenv import load_dotenv
 
@@ -46,6 +47,14 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+try:
+    SERVER_VERSION = version("grok-mcp-server")
+except PackageNotFoundError:
+    SERVER_VERSION = "unknown"
+
+# Only stateless tools are cached; session and health tools must always run
+CACHEABLE_TOOLS = {"grok_ask", "grok_ask_with_context"}
 
 # Global instances
 grok_client = None
@@ -219,7 +228,7 @@ class EnhancedMCPServer:
                 "capabilities": self.capabilities,
                 "serverInfo": {
                     "name": "grok-enhanced",
-                    "version": "0.8.0"
+                    "version": SERVER_VERSION
                 }
             }
         }
@@ -258,29 +267,30 @@ class EnhancedMCPServer:
                 # For now, fall back to non-streaming
                 arguments["stream"] = False
             
-            # Execute the tool
-            tool = tools[tool_name]
-            result = await tool.execute(**arguments)
-            
-            # Check cache for repeated questions (Phase 5)
+            # Serve repeated calls from the cache instead of calling Grok again
             cache_key = f"{tool_name}:{json.dumps(arguments, sort_keys=True)}"
-            cache_enabled = os.getenv('MCP_ENABLE_CACHING', 'true').lower() == 'true'
-            cache_hit = False
-            
-            if cache_key in cache and cache_enabled:
+            cache_enabled = (
+                tool_name in CACHEABLE_TOOLS
+                and os.getenv('MCP_ENABLE_CACHING', 'true').lower() == 'true'
+            )
+            result = None
+
+            if cache_enabled and cache_key in cache:
                 cache_entry = cache[cache_key]
-                if (datetime.now() - cache_entry['timestamp']).seconds < int(os.getenv('MCP_CACHE_TTL', '3600')):
+                age = (datetime.now() - cache_entry['timestamp']).total_seconds()
+                if age < int(os.getenv('MCP_CACHE_TTL', '3600')):
                     logger.debug(f"Cache hit for {cache_key}")
                     result = cache_entry['result']
-                    cache_hit = True
                 else:
-                    # Remove expired entry
                     self._remove_from_cache(cache_key)
-            
-            if not cache_hit and cache_enabled:
-                # Check if adding to cache would exceed size limit
-                self._add_to_cache(cache_key, result)
-            
+
+            if result is None:
+                tool = tools[tool_name]
+                result = await tool.execute(**arguments)
+                # Never cache failures, so a transient error is retried next time
+                if cache_enabled and not result.startswith("Error"):
+                    self._add_to_cache(cache_key, result)
+
             # Check response size and truncate if necessary
             max_response_tokens = int(os.getenv('MCP_MAX_RESPONSE_TOKENS', '40000'))
             estimated_tokens = self._estimate_tokens(result)
