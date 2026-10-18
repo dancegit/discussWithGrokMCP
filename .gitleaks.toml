@@ -1,0 +1,15 @@
+# gitleaks config: the default ruleset plus token formats it does not cover.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "supabase-access-token"
+description = "Supabase personal access token"
+regex = '''\bsbp_[0-9a-f]{40}\b'''
+keywords = ["sbp_"]
+
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase secret API key"
+regex = '''\bsb_secret_[A-Za-z0-9_-]{20,}\b'''
+keywords = ["sb_secret_"]

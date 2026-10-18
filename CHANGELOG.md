@@ -12,7 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README rewritten to describe only verified behaviour.
 - `.env.example` now lists exactly the variables the server reads.
 
+### Security
+- Git history rewritten to remove committed session logs, log archives and a `.mcp.json.bak` that held a Brave Search key and a Supabase access token (both revoked).
+- `.gitleaks.toml` adds Supabase token rules; the default gitleaks ruleset did not flag the leaked token.
+
 ### Fixed
+- `LICENSE` now holds the full GPL-3.0 text, so GitHub detects the license.
 - Response cache was checked after the tool had already called Grok, so it never saved an API call and could replace a fresh answer with a stale one. It is now checked first, limited to the stateless tools, and errors are not cached.
 - `serverInfo.version` now reports the package version instead of a hard-coded `0.8.0`.
 - `lib.session_manager.SessionManager` no longer crashes when constructed outside an event loop.

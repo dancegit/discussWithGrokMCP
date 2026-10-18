@@ -175,7 +175,7 @@ says so; the tool itself returns the full text.
 ## Testing
 
 ```bash
-uv run pytest                                     # 87 offline tests, no network
+uv run pytest                                     # 133 offline tests, no network
 uv run pytest -m live                             # 2 tests against the xAI API (needs XAI_API_KEY)
 RUN_GROK_CLI_TESTS=1 uv run pytest -m live_cli    # 4 containment checks against the real grok CLI
 ```
@@ -189,7 +189,8 @@ tests need no key and no network.
 CI runs on every push and pull request:
 
 - **pytest** on Python 3.11, 3.12 and 3.13
-- **gitleaks** over the full git history
+- **gitleaks** over the full git history, with extra rules for Supabase tokens
+  (`.gitleaks.toml`), which the default ruleset misses
 
 ## Layout
 
@@ -219,3 +220,6 @@ archive/               Earlier server prototypes, unmaintained
 ## License
 
 GPL-3.0. See [LICENSE](LICENSE).
+
+This server calls xAI's Grok services, which have their own terms of service. You are
+responsible for following them and for the API key or account you use.
