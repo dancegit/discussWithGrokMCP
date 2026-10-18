@@ -35,6 +35,15 @@ flowchart LR
 
 Resources: `grok://sessions`, `grok://config`, `grok://stats`.
 
+### Discussions survive restarts
+
+`grok_discuss` saves each session as JSON under `sessions/`. Any later server process can
+list it and continue it with the full history, including after Claude Code restarts.
+
+![Demo: a discussion started in one server process, then listed and resumed from a fresh process](docs/demo-discussion.gif)
+
+### File context
+
 `context_files` accepts any mix of:
 
 ```jsonc
@@ -112,8 +121,13 @@ does. It lists the tools, asks a question, asks it again to show the cache, and 
 about a line range of a source file:
 
 ```bash
-uv run python scripts/demo.py
+uv run python scripts/demo.py               # ask, cache hit, ask with file context
+uv run python scripts/demo_discussion.py    # discuss, restart the server, resume
 ```
+
+Both GIFs are recorded from these scripts with [VHS](https://github.com/charmbracelet/vhs)
+(`docs/*.tape`). `scripts/squash_gif.py` then shortens the waits for Grok; the timings on
+screen are the real ones.
 
 ## Testing
 

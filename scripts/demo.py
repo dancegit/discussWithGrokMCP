@@ -25,11 +25,11 @@ BACKEND_LABELS = {
 
 
 class StdioClient:
-    def __init__(self) -> None:
+    def __init__(self, cwd: Path = ROOT) -> None:
         self.proc = subprocess.Popen(
             [sys.executable, str(ROOT / "enhanced_mcp.py")],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, cwd=ROOT,
+            text=True, cwd=cwd,
         )
         self.next_id = 1
 

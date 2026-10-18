@@ -18,6 +18,8 @@ not maintained. Do not add new entry points.
 - `lib/session_manager.py`, `storage_manager.py`, `baseline_generator.py`,
   `context_analyzer.py` - used by the archived servers; covered by `tests/test_components.py`
 - `scripts/repair_session.py` - fixes sessions saved before model/context settings existed
+- `scripts/demo.py`, `scripts/demo_discussion.py` - stdio demo clients behind the README GIFs
+  (`docs/*.tape`, post-processed by `scripts/squash_gif.py`)
 
 Tools: `grok_ask`, `grok_ask_with_context`, `grok_discuss`, `grok_continue_session`,
 `grok_list_sessions`, `grok_health`. Resources: `grok://sessions`, `grok://config`,
