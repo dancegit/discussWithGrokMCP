@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite passes on a clean checkout (was 46 passed / 14 failed): the xAI client is faked in `tests/conftest.py`, stale assertions updated.
 
 ### Added
+- `grok_panel`: a panel of 2-6 agents debates a topic over rounds (independent parallel openings, then rebuttals over the transcript) and a moderator writes the synthesis. Panels persist and resume with a user message.
+- Panel demo GIF (`scripts/demo_panel.py`, `docs/demo-panel.tape`); demo topics are general-interest examples.
+- Agent personas (`lib/agents.py`): 8 presets (plus example `economist` and `data-engineer` files), Markdown agent files in `agents/` or `GROK_AGENTS_DIR`, and inline `{name, instructions}`; per-agent `model`.
+- `grok_discuss` accepts `agent` and `system_prompt`; the persona is stored with the session and reapplied by `grok_continue_session`. `expert_mode` is unchanged.
 - `cli` backend (`GROK_BACKEND`): use a signed-in Grok account via the official `grok` CLI instead of an API key. Runs are sandboxed (`--sandbox strict`), tool-less, and run with a throwaway `HOME` so none of the user's Claude/Cursor setup (instructions, permission rules, agents, skills, hooks, MCP servers) loads; live tests verify this against the real CLI.
 - `grok_health` probes the backend with `check_connection()` (a model list for the CLI, not a billed prompt) and reports which backend is active.
 - Second demo GIF (`scripts/demo_discussion.py`, `docs/demo-discussion.tape`): a discussion started in one server process and resumed from another.

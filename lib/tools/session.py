@@ -50,19 +50,30 @@ class SessionManager:
         self._save_session(session_id)
         return session_id
     
-    def add_message(self, session_id: str, role: str, content: str):
-        """Add a message to a session."""
+    def add_message(self, session_id: str, role: str, content: str, name: Optional[str] = None):
+        """Add a message to a session. ``name`` records the speaker (panel agents)."""
         if session_id not in self.sessions:
             raise ValueError(f"Session {session_id} not found")
-        
-        self.sessions[session_id]["messages"].append({
+
+        message = {
             "role": role,
             "content": content,
             "timestamp": datetime.now().isoformat()
-        })
+        }
+        if name:
+            message["name"] = name
+        self.sessions[session_id]["messages"].append(message)
         self.sessions[session_id]["updated_at"] = datetime.now().isoformat()
         self._save_session(session_id)
     
+    def update_session(self, session_id: str, **fields: Any):
+        """Set top-level session fields (e.g. type, panel, system_prompt) and save."""
+        if session_id not in self.sessions:
+            raise ValueError(f"Session {session_id} not found")
+        self.sessions[session_id].update(fields)
+        self.sessions[session_id]["updated_at"] = datetime.now().isoformat()
+        self._save_session(session_id)
+
     def get_session(self, session_id: str) -> Optional[Dict]:
         """Get a session by ID."""
         return self.sessions.get(session_id)
@@ -86,6 +97,11 @@ class SessionManager:
         with open(session_file, 'w') as f:
             json.dump(session, f, indent=2)
     
+    def delete_session(self, session_id: str):
+        """Remove a session from memory and disk."""
+        self.sessions.pop(session_id, None)
+        (self.storage_path / f"{session_id}.json").unlink(missing_ok=True)
+
     def close_session(self, session_id: str):
         """Mark a session as completed."""
         if session_id in self.sessions:
@@ -142,6 +158,11 @@ class ListSessionsTool(BaseTool):
                 result += f"ID: {session['id']}\n"
                 result += f"Topic: {session['topic']}\n"
                 result += f"Status: {session['status']}\n"
+                if session.get("type") == "panel":
+                    names = ", ".join(a["name"] for a in session["panel"]["agents"])
+                    result += f"Panel: {names} ({session['panel']['rounds_run']} rounds)\n"
+                elif session.get("agent"):
+                    result += f"Agent: {session['agent']}\n"
                 result += f"Messages: {len(session['messages'])}\n"
                 result += f"Updated: {session['updated_at']}\n"
                 result += "-" * 40 + "\n"
@@ -234,7 +255,10 @@ class ContinueSessionTool(BaseTool):
             session = self.session_manager.get_session(session_id)
             if not session:
                 return f"Session {session_id} not found"
-            
+            if session.get("type") == "panel":
+                return (f"Session {session_id} is a panel discussion; resume it with "
+                        f"grok_panel session_id='{session_id}' and a message")
+
             # Build message with context if provided
             full_message = message
             if context_files:
@@ -255,6 +279,8 @@ class ContinueSessionTool(BaseTool):
             # Build conversation history
             messages = [{"role": msg["role"], "content": msg["content"]}
                        for msg in session["messages"]]
+            if session.get("system_prompt"):
+                messages.insert(0, {"role": "system", "content": session["system_prompt"]})
 
             # Check if session has a stored model
             model_client = self.grok_client

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from .base import BaseTool
 from .session import SessionManager
 from .context_loader import ContextLoader
+from ..agents import AgentError, resolve_agent
 import logging
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,14 @@ class DiscussTool(BaseTool):
                     "maximum": 10,
                     "default": 3
                 },
+                "agent": {
+                    "oneOf": [{"type": "string"}, {"type": "object"}],
+                    "description": "Persona for Grok: a preset/custom agent name (see grok_panel) or {name, instructions}"
+                },
+                "system_prompt": {
+                    "type": "string",
+                    "description": "Custom system instructions for this discussion (added after the agent's, if both)"
+                },
                 "expert_mode": {
                     "type": "boolean",
                     "description": "Include expert perspectives",
@@ -146,9 +155,15 @@ class DiscussTool(BaseTool):
                      max_turns: int = 3, expert_mode: bool = False,
                      page: int = 1, turns_per_page: int = 2,
                      paginate: bool = True, model: str = None,
-                     max_tokens_per_turn: int = 20000, **kwargs) -> str:
+                     max_tokens_per_turn: int = 20000, agent: Any = None,
+                     system_prompt: str = None, **kwargs) -> str:
         """Start a discussion with optional file context and pagination support."""
         try:
+            # A new discussion's persona may carry its own model
+            persona = resolve_agent(agent) if agent and not kwargs.get('session_id') else None
+            if not model and persona and persona.model:
+                model = persona.model
+
             # Handle model selection and adjust context limits
             if not model:
                 model = "grok-code-fast"  # Default model
@@ -195,7 +210,11 @@ class DiscussTool(BaseTool):
                     "context_type": context_type,
                     "max_tokens_per_turn": max_tokens_per_turn
                 }
+                system = "\n\n".join(p for p in (persona and persona.instructions, system_prompt) if p)
                 session_id = self.session_manager.create_session(topic, pagination_settings)
+                if system:
+                    self.session_manager.update_session(
+                        session_id, system_prompt=system, agent=persona.name if persona else "custom")
                 
                 # Build file context if provided
                 file_context = ""
@@ -230,6 +249,9 @@ class DiscussTool(BaseTool):
                 session = self.session_manager.get_session(session_id)
                 if not session:
                     return f"Error: Session {session_id} not found"
+                if session.get("type") == "panel":
+                    return (f"Error: Session {session_id} is a panel discussion; resume it with "
+                            f"grok_panel session_id='{session_id}' and a message")
                 messages = session['messages']
 
                 # Retrieve pagination and model settings from session if they exist
@@ -362,6 +384,9 @@ class DiscussTool(BaseTool):
             result = f"Discussion on: {topic}\n"
             result += f"Session ID: {session_id}\n"
             result += f"Model: {model} (Context limit: {effective_limit:,} lines)\n"
+            persona_name = (self.session_manager.get_session(session_id) or {}).get("agent")
+            if persona_name:
+                result += f"Agent: {persona_name}\n"
             
             if context_files:
                 # Format context files for display
@@ -422,7 +447,7 @@ class DiscussTool(BaseTool):
 
                 # Generate new turn
                 response = await model_client.ask_with_history(
-                    messages=messages,
+                    messages=self._with_system(session_id, messages),
                     stream=False
                 )
 
@@ -461,6 +486,8 @@ class DiscussTool(BaseTool):
             
             return result
             
+        except AgentError as e:
+            return f"Error: {e}"
         except Exception as e:
             logger.error(f"Error in discussion: {e}")
             return f"Error: {str(e)}"
@@ -480,6 +507,11 @@ class DiscussTool(BaseTool):
         
         return prompt
     
+    def _with_system(self, session_id: str, messages: List[Dict]) -> List[Dict]:
+        """Prepend the session's stored system prompt (agent persona), if any."""
+        system = (self.session_manager.get_session(session_id) or {}).get("system_prompt")
+        return ([{"role": "system", "content": system}] if system else []) + list(messages)
+
     def _generate_follow_up(self, response: str, expert_mode: bool, has_file_context: bool = False) -> str:
         """Generate a follow-up question based on the response."""
         if has_file_context:

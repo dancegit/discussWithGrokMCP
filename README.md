@@ -28,12 +28,53 @@ flowchart LR
 |------|--------------|
 | `grok_ask` | Single question, single answer |
 | `grok_ask_with_context` | Question plus file/directory/glob context |
-| `grok_discuss` | Multi-turn discussion on a topic, saved as a session |
+| `grok_discuss` | Multi-turn discussion on a topic, saved as a session, optionally with an agent persona |
+| `grok_panel` | A panel of agents with different roles debates a topic, then a moderator synthesises |
 | `grok_continue_session` | Add a turn (and optionally more context) to a saved session |
 | `grok_list_sessions` | List saved sessions |
 | `grok_health` | Check API connectivity and server stats |
 
 Resources: `grok://sessions`, `grok://config`, `grok://stats`.
+
+### Panels of agents
+
+![Demo: a skeptic, an economist and a team lead debate a four-day work week over two rounds, then the moderator recommends](docs/demo-panel.gif)
+
+`grok_panel` puts 2-6 agents on a topic. Each agent is a name plus system instructions.
+In round 1 every agent gives an independent opening position, run in parallel so nobody
+anchors on anyone else. In later rounds each agent reads the transcript and responds to the
+others by name. A neutral moderator then writes up consensus, disagreements (who holds which
+view), a recommendation and open questions.
+
+```jsonc
+{
+  "topic": "Should a 50-person software company try a four-day work week?",
+  "agents": [
+    "skeptic",                                                   // built-in preset
+    "economist",                                                 // custom agent from agents/
+    {"name": "team-lead", "instructions": "You lead a team of eight engineers..."}  // inline
+  ],
+  "rounds": 2,
+  "max_words": 120
+}
+```
+
+A panel is saved as a session. To resume it, call `grok_panel` with its `session_id` and a
+`message`. Every agent sees your message and the earlier synthesis, and the panel runs
+another round.
+
+**Agents** come from three places:
+
+- **Presets:** `architect`, `security`, `skeptic`, `pragmatist`, `qa`, `performance`, `product`, `researcher`.
+- **Markdown files** in [`agents/`](agents/) or any directory in `GROK_AGENTS_DIR`. They use
+  the same frontmatter-plus-prompt format as Claude Code agents. Two examples ship with the
+  repo: `economist` and `data-engineer`.
+- **Inline objects** `{"name", "instructions"}` passed in the call. Any agent can also take
+  its own `model`.
+
+`grok_discuss` takes the same `agent` names, or a free-form `system_prompt`, for a
+single-voice discussion with a persona. The persona is stored with the session, so
+`grok_continue_session` keeps it.
 
 ### Discussions survive restarts
 
@@ -123,11 +164,13 @@ about a line range of a source file:
 ```bash
 uv run python scripts/demo.py               # ask, cache hit, ask with file context
 uv run python scripts/demo_discussion.py    # discuss, restart the server, resume
+uv run python scripts/demo_panel.py         # three agents debate, moderator recommends
 ```
 
-Both GIFs are recorded from these scripts with [VHS](https://github.com/charmbracelet/vhs)
+The GIFs are recorded from these scripts with [VHS](https://github.com/charmbracelet/vhs)
 (`docs/*.tape`). `scripts/squash_gif.py` then shortens the waits for Grok; the timings on
-screen are the real ones.
+screen are the real ones. The panel demo shortens each contribution to fit the GIF and
+says so; the tool itself returns the full text.
 
 ## Testing
 
@@ -137,9 +180,9 @@ uv run pytest -m live                             # 2 tests against the xAI API 
 RUN_GROK_CLI_TESTS=1 uv run pytest -m live_cli    # 4 containment checks against the real grok CLI
 ```
 
-The offline suite covers the six tools, the file-context loader, session persistence,
-response caching, backend selection and the JSON-RPC protocol (the server runs as a
-subprocess). A conftest fixture replaces `GrokClient` with an in-memory fake, and the CLI
+The offline suite covers all seven tools, agent loading, panel rounds and resume, the
+file-context loader, session persistence, response caching, backend selection and the
+JSON-RPC protocol (the server runs as a subprocess). A conftest fixture replaces `GrokClient` with an in-memory fake, and the CLI
 backend is tested against a fake `grok` executable that records its arguments, so these
 tests need no key and no network.
 
@@ -154,7 +197,9 @@ CI runs on every push and pull request:
 enhanced_mcp.py        MCP server entry point (JSON-RPC over stdio)
 lib/grok_client.py     Async xAI API client with retry/backoff, backend factory
 lib/grok_cli_client.py Sandboxed client for the signed-in grok CLI
+lib/agents.py          Agent presets and loader for agents/*.md
 lib/tools/             One module per tool, plus the context loader
+agents/                Example custom agents (Markdown + frontmatter)
 tests/                 pytest suite (offline + live)
 scripts/               Demo client, GIF post-processing, session repair
 docs/                  Demo GIF and the VHS tape that records it

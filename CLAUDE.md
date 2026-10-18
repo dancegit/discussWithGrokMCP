@@ -13,15 +13,18 @@ not maintained. Do not add new entry points.
 - `lib/grok_cli_client.py` - backend that runs the signed-in `grok` CLI headless. Every
   run is locked down (tools removed, `--sandbox strict`, Claude/Cursor compat scanning off).
   Never loosen `LOCKDOWN_ARGS` / `ISOLATION_ENV` without re-running the live_cli tests.
-- `lib/tools/` - one module per tool (`ask`, `discuss`, `session`, `context`, `health`),
+- `lib/agents.py` - agent personas: presets, `agents/*.md` + `GROK_AGENTS_DIR` files, inline
+  specs; used by `grok_panel` and the `agent` param of `grok_discuss`
+- `lib/tools/` - one module per tool (`ask`, `discuss`, `panel`, `session`, `context`, `health`),
   `context_loader.py` resolves files/dirs/globs/line ranges, `base.py` is the tool base class
 - `lib/session_manager.py`, `storage_manager.py`, `baseline_generator.py`,
   `context_analyzer.py` - used by the archived servers; covered by `tests/test_components.py`
 - `scripts/repair_session.py` - fixes sessions saved before model/context settings existed
-- `scripts/demo.py`, `scripts/demo_discussion.py` - stdio demo clients behind the README GIFs
+- `scripts/demo.py`, `scripts/demo_discussion.py`, `scripts/demo_panel.py` - stdio demo clients
+  behind the README GIFs; keep their topics general (no personal projects)
   (`docs/*.tape`, post-processed by `scripts/squash_gif.py`)
 
-Tools: `grok_ask`, `grok_ask_with_context`, `grok_discuss`, `grok_continue_session`,
+Tools: `grok_ask`, `grok_ask_with_context`, `grok_discuss`, `grok_panel`, `grok_continue_session`,
 `grok_list_sessions`, `grok_health`. Resources: `grok://sessions`, `grok://config`,
 `grok://stats`. Configuration is environment variables; `.env.example` lists every one the
 server reads - keep it in sync when adding a variable.

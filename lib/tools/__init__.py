@@ -7,6 +7,7 @@ from .discuss import DiscussTool
 from .session import SessionManager, ListSessionsTool, ContinueSessionTool
 from .context import AskWithContextTool
 from .health import HealthCheckTool
+from .panel import PanelTool
 
 __all__ = [
     'AskTool',
@@ -15,5 +16,6 @@ __all__ = [
     'ListSessionsTool',
     'ContinueSessionTool',
     'AskWithContextTool',
-    'HealthCheckTool'
+    'HealthCheckTool',
+    'PanelTool'
 ]

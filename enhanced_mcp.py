@@ -27,7 +27,8 @@ from lib.tools import (
     ListSessionsTool,
     ContinueSessionTool,
     AskWithContextTool,
-    HealthCheckTool
+    HealthCheckTool,
+    PanelTool
 )
 
 # Load .env
@@ -120,6 +121,7 @@ class EnhancedMCPServer:
         tool_instances = [
             AskTool(grok_client),
             DiscussTool(grok_client, session_manager),
+            PanelTool(grok_client, session_manager),
             ListSessionsTool(grok_client, session_manager),
             ContinueSessionTool(grok_client, session_manager),
             AskWithContextTool(grok_client),
