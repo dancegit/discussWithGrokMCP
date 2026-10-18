@@ -289,6 +289,9 @@ async def test_with_actual_tools():
     
     # Create mock client
     class MockGrokClient:
+        model = "grok-code-fast"
+        temperature = 0.7
+
         async def ask(self, prompt, stream=False):
             from lib.grok_client import GrokResponse
             return GrokResponse(

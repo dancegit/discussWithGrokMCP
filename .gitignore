@@ -1,38 +1,36 @@
-# Environment variables
+# Secrets
 .env
 !.env.example
 .mcp.json
+
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.pyc
 .pytest_cache/
 .venv/
 *.egg-info/
 dist/
 build/
+.coverage
+coverage.xml
 
-# Logs
+# Runtime data (logs, sessions, responses) - never commit
 *.log
-grok_mcp_server.log
-
-# Test outputs
-test_storage/
+*.log.*
+logs/
 sessions/
+test_sessions/
+test_storage/
 grok_discussions/
+outputs/
+*.bak
 
-# IDE
+# Local Claude Code settings
+.claude/
+
+# IDE / OS
 .idea/
 .vscode/
 *.swp
-*.swo
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Project specific - keep example configs
-!*.example
-!.mcp.json.example
-!claude_desktop_config.json.example

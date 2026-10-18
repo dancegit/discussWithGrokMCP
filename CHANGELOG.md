@@ -5,6 +5,25 @@ All notable changes to the Grok MCP Server project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- `enhanced_mcp.py` is the single supported entry point; five other server prototypes moved to `archive/legacy_servers/`.
+- README rewritten to describe only verified behaviour.
+- `.env.example` now lists exactly the variables the server reads.
+
+### Fixed
+- `lib.session_manager.SessionManager` no longer crashes when constructed outside an event loop.
+- Test suite passes on a clean checkout (was 46 passed / 14 failed): the xAI client is faked in `tests/conftest.py`, stale assertions updated.
+
+### Added
+- GitHub Actions CI: pytest on Python 3.11-3.13 and a gitleaks scan of full history.
+- Tests for `grok_list_sessions` and `grok_continue_session`.
+- `live` pytest marker for tests that call the real xAI API (skipped without `XAI_API_KEY`).
+
+### Removed
+- Committed logs, saved session/response JSON, `.bak` files, ad-hoc root test scripts, and shell wrappers with hard-coded home-directory paths.
+
 ## [0.1.0] - 2025-08-13
 
 ### Added

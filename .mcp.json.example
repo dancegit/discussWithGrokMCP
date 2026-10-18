@@ -1,12 +1,9 @@
 {
   "mcpServers": {
     "grok": {
+      "type": "stdio",
       "command": "uv",
-      "args": ["run", "python", "mcp_server.py"],
-      "cwd": "/absolute/path/to/discussWithGrokMCP",
-      "env": {
-        "XAI_API_KEY": "your_xai_api_key_here"
-      }
+      "args": ["--project", "/absolute/path/to/discussWithGrokMCP", "run", "/absolute/path/to/discussWithGrokMCP/enhanced_mcp.py"]
     }
   }
 }

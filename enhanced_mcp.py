@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Enhanced MCP server with all features from the improvement spec.
-Backward compatible with simple_mcp.py.
+MCP server exposing Grok (xAI) tools to Claude Code over JSON-RPC stdio.
 """
 
 import sys

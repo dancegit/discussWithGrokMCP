@@ -24,12 +24,11 @@ class TestMCPProtocol:
         """Start the enhanced MCP server as a subprocess."""
         # Start server
         proc = subprocess.Popen(
-            [sys.executable, "enhanced_mcp.py"],
+            [sys.executable, str(Path(__file__).parent.parent / "enhanced_mcp.py")],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd=Path(__file__).parent.parent
         )
         
         # Give it time to start

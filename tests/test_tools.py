@@ -24,6 +24,8 @@ class TestAskTool:
     def mock_client(self):
         """Create a mock Grok client."""
         client = Mock()
+        client.model = "grok-code-fast"
+        client.temperature = 0.7
         client.ask = AsyncMock(return_value=GrokResponse(
             content="Test response",
             tokens_used=10,
@@ -131,6 +133,8 @@ class TestDiscussTool:
     def mock_client(self):
         """Create a mock Grok client."""
         client = Mock()
+        client.model = "grok-code-fast"
+        client.temperature = 0.7
         client.ask_with_history = AsyncMock(return_value=GrokResponse(
             content="Discussion response",
             tokens_used=20,
@@ -211,6 +215,8 @@ class TestContextTool:
     def mock_client(self):
         """Create a mock Grok client."""
         client = Mock()
+        client.model = "grok-code-fast"
+        client.temperature = 0.7
         client.ask = AsyncMock(return_value=GrokResponse(
             content="Context response",
             tokens_used=30,
@@ -243,7 +249,7 @@ class TestContextTool:
             context_type="code"
         )
         
-        assert result == "Context response"
+        assert result == "Context response\n\n[Context: 1 files, 2 lines]"
     
     @pytest.mark.asyncio
     async def test_nonexistent_file(self, context_tool):
@@ -254,7 +260,7 @@ class TestContextTool:
         )
         
         # Should still work, just with error in context
-        assert result == "Context response"
+        assert result.startswith("Context response")
     
     @pytest.mark.asyncio
     async def test_file_with_line_range(self, context_tool, tmp_path):
@@ -284,7 +290,7 @@ def function4():
             context_type="code"
         )
         
-        assert result == "Context response"
+        assert result == "Context response\n\n[Context: 1 files, 3 lines]"
     
     @pytest.mark.asyncio
     async def test_mixed_file_specifications(self, context_tool, tmp_path):
@@ -308,7 +314,76 @@ def function4():
             ]
         )
         
-        assert result == "Context response"
+        assert result == "Context response\n\n[Context: 2 files, 7 lines]"
+
+
+class TestSessionTools:
+    """Test listing and continuing saved sessions."""
+
+    @pytest.fixture
+    def session_manager(self, tmp_path):
+        return SessionManager(tmp_path / "sessions")
+
+    @pytest.mark.asyncio
+    async def test_list_sessions_empty(self, fake_client, session_manager):
+        tool = ListSessionsTool(fake_client, session_manager)
+        assert await tool.execute() == "No sessions found."
+
+    @pytest.mark.asyncio
+    async def test_list_sessions_shows_topics(self, fake_client, session_manager):
+        session_manager.create_session("Caching strategy")
+        tool = ListSessionsTool(fake_client, session_manager)
+        result = await tool.execute()
+        assert result.startswith("Found 1 session(s)")
+        assert "Topic: Caching strategy" in result
+
+    @pytest.mark.asyncio
+    async def test_continue_unknown_session(self, fake_client, session_manager):
+        tool = ContinueSessionTool(fake_client, session_manager)
+        result = await tool.execute(session_id="missing", message="Hello")
+        assert result == "Session missing not found"
+        assert fake_client.calls == []
+
+    @pytest.mark.asyncio
+    async def test_continue_sends_history_and_persists(self, fake_client, session_manager, tmp_path):
+        session_id = session_manager.create_session("Topic")
+        session_manager.add_message(session_id, "user", "First question")
+        session_manager.add_message(session_id, "assistant", "First answer")
+
+        tool = ContinueSessionTool(fake_client, session_manager)
+        result = await tool.execute(session_id=session_id, message="Follow-up")
+
+        assert result == fake_client.reply
+        sent = fake_client.calls[0]["messages"]
+        assert [m["content"] for m in sent] == ["First question", "First answer", "Follow-up"]
+
+        reloaded = SessionManager(tmp_path / "sessions").get_session(session_id)
+        assert [m["role"] for m in reloaded["messages"]] == ["user", "assistant", "user", "assistant"]
+
+    @pytest.mark.asyncio
+    async def test_continue_with_context_file(self, fake_client, session_manager, tmp_path):
+        source = tmp_path / "module.py"
+        source.write_text("def answer():\n    return 42\n")
+        session_id = session_manager.create_session("Topic")
+
+        tool = ContinueSessionTool(fake_client, session_manager)
+        await tool.execute(session_id=session_id, message="Review this", context_files=[str(source)])
+
+        user_message = fake_client.calls[0]["messages"][-1]["content"]
+        assert user_message.startswith("Review this")
+        assert "return 42" in user_message
+        assert "[Loaded 1 files" in user_message
+
+    @pytest.mark.asyncio
+    async def test_continue_uses_model_stored_in_session(self, fake_client, session_manager):
+        session_id = session_manager.create_session("Topic", {"model": "grok-4-fast-reasoning"})
+
+        tool = ContinueSessionTool(fake_client, session_manager)
+        await tool.execute(session_id=session_id, message="Hi")
+
+        # A separate client is built for the stored model; the default one stays unused.
+        assert fake_client.calls == []
+        assert session_manager.get_session(session_id)["messages"][-1]["role"] == "assistant"
 
 
 class TestHealthCheckTool:
@@ -318,6 +393,8 @@ class TestHealthCheckTool:
     def mock_client(self):
         """Create a mock Grok client."""
         client = Mock()
+        client.model = "grok-code-fast"
+        client.temperature = 0.7
         client.ask = AsyncMock(return_value=GrokResponse(
             content="pong",
             tokens_used=1,

@@ -536,8 +536,13 @@ class SessionManager:
                 except Exception as e:
                     logger.error(f"Error in periodic cleanup: {e}")
         
-        # Create and store the task
-        self._cleanup_task = asyncio.create_task(periodic_cleanup())
+        # Only schedule when constructed inside a running event loop; a manager
+        # created from synchronous code simply has no background cleanup.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._cleanup_task = loop.create_task(periodic_cleanup())
     
     def stop_cleanup_task(self):
         """Stop the periodic cleanup task."""
